@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ckaal/charon/internal/config"
+	"github.com/crixuamg/charon/internal/config"
 )
 
 // findKittySocket finds the kitty socket path

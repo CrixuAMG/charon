@@ -78,7 +78,7 @@ Charon reads its configuration from `~/.config/charon/.charon.yaml`.
 ```yaml
 # Global settings
 docker_path: /var/www/html    # Default Docker path for projects
-container: dev.ldev.nl        # Docker container name
+container: my-container       # Docker container name
 
 # Projects
 projects:

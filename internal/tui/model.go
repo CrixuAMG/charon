@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	"github.com/ckaal/charon/internal/config"
-	"github.com/ckaal/charon/internal/kitty"
+	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/kitty"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"

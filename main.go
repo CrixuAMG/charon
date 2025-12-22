@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ckaal/charon/internal/config"
-	"github.com/ckaal/charon/internal/tui"
+	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

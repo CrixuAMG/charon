@@ -1,4 +1,4 @@
-module github.com/ckaal/charon
+module github.com/crixuamg/charon
 
 go 1.25.5
 
