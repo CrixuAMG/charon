@@ -12,26 +12,34 @@ A TUI project opener for Kitty terminal with Docker support. Named after the fer
 - **Kitty Integration** - Opens projects in new tabs in your current Kitty window
 - **Multiple Tasks** - Each project can have multiple tasks, each opening in its own tab
 - **Persistent Config** - Projects are saved to a YAML config file
+- **Shell Agnostic** - Works with bash, zsh, nushell, and other shells
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap crixuamg/charon
+brew install charon
+```
+
 ### From Release
 
-Download the latest binary from the [releases page](https://github.com/ckaal/charon/releases):
+Download the latest binary from the [releases page](https://github.com/crixuamg/charon/releases):
 
 ```bash
 # Linux (amd64)
-curl -L https://github.com/ckaal/charon/releases/latest/download/charon-linux-amd64 -o charon
+curl -L https://github.com/crixuamg/charon/releases/latest/download/charon-linux-amd64 -o charon
 chmod +x charon
 sudo mv charon /usr/local/bin/
 
 # macOS (Apple Silicon)
-curl -L https://github.com/ckaal/charon/releases/latest/download/charon-darwin-arm64 -o charon
+curl -L https://github.com/crixuamg/charon/releases/latest/download/charon-darwin-arm64 -o charon
 chmod +x charon
 sudo mv charon /usr/local/bin/
 
 # macOS (Intel)
-curl -L https://github.com/ckaal/charon/releases/latest/download/charon-darwin-amd64 -o charon
+curl -L https://github.com/crixuamg/charon/releases/latest/download/charon-darwin-amd64 -o charon
 chmod +x charon
 sudo mv charon /usr/local/bin/
 ```
@@ -39,7 +47,7 @@ sudo mv charon /usr/local/bin/
 ### From Source
 
 ```bash
-git clone https://github.com/ckaal/charon.git
+git clone https://github.com/crixuamg/charon.git
 cd charon
 go build -o charon .
 sudo mv charon /usr/local/bin/
@@ -70,7 +78,7 @@ Charon reads its configuration from `~/.config/charon/.charon.yaml`.
 ```yaml
 # Global settings
 docker_path: /var/www/html    # Default Docker path for projects
-container:   my-container       # Docker container name
+container: dev.ldev.nl        # Docker container name
 
 # Projects
 projects:
@@ -80,7 +88,7 @@ projects:
     tasks:
       - lazygit
       - vim
-      - "yarn dev; exit;"
+      - yarn dev
       - db
 
   - name: local-project
@@ -150,21 +158,22 @@ charon
 
 ### Local Projects
 
-For local projects (empty `docker_path`), Charon runs:
-
-```bash
-cd ~/path/to/project && <task>
-```
+For local projects (empty `docker_path`), Charon:
+1. Opens a new Kitty tab with an interactive shell
+2. Sends `cd <path>` to navigate to the project
+3. Sends the task command (e.g., `lazygit`)
 
 ### Docker Projects
 
-For Docker projects, Charon runs:
+For Docker projects, Charon:
+1. Opens a new Kitty tab running `docker exec -it <container> $SHELL`
+2. Waits for the shell to initialize
+3. Sends `cd <docker_path>/<project>` to navigate
+4. Sends the task command
 
-```bash
-docker exec -it -w /docker/path/project container bash -ic 'cd /docker/path/project && <task>'
-```
+### Tab Titles
 
-Each task opens in a new Kitty tab with an appropriate title based on the command:
+Each task opens in a new Kitty tab with an appropriate title:
 
 | Command | Tab Title |
 |---------|-----------|

@@ -160,7 +160,7 @@ func (m *Model) initFormInputs(project *config.Project) {
 
 	// Tasks input
 	m.formInputs[3] = textinput.New()
-	m.formInputs[3].Placeholder = "lazygit, vim, yarn dev"
+	m.formInputs[3].Placeholder = "echo 'Hello World'; pwd;"
 	m.formInputs[3].CharLimit = 500
 	m.formInputs[3].Width = 40
 

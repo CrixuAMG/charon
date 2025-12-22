@@ -4,11 +4,33 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ckaal/charon/internal/config"
 )
+
+// findKittySocket finds the kitty socket path
+func findKittySocket() (string, error) {
+	// First check environment variable
+	if socket := os.Getenv("KITTY_LISTEN_ON"); socket != "" {
+		return socket, nil
+	}
+
+	// Look for socket files in /tmp
+	matches, err := filepath.Glob("/tmp/kitty-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to search for kitty socket: %w", err)
+	}
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no kitty socket found in /tmp")
+	}
+
+	return "unix:" + matches[0], nil
+}
 
 // OpenProject opens a project in kitty with tabs for each task
 func OpenProject(project config.Project, cfg *config.Config) error {
@@ -19,123 +41,120 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 
 	useDocker := dockerPath != ""
 
-	// Build all commands
-	var commands []struct {
-		title string
-		cmd   string
-	}
-
-	for _, task := range project.Tasks {
-		var cmd string
-		if useDocker {
-			projectDir := fmt.Sprintf("%s/%s", strings.TrimSuffix(dockerPath, "/"), project.Name)
-			// Use docker exec to run commands inside the container
-			containerCmd := fmt.Sprintf("cd %s && %s", projectDir, task)
-			cmd = fmt.Sprintf("docker exec -it -w %s %s bash -ic '%s'",
-				projectDir,
-				cfg.Container,
-				strings.ReplaceAll(containerCmd, "'", "'\\''"))
-		} else {
-			cmd = fmt.Sprintf("cd %s && %s", project.Path, task)
-		}
-
-		commands = append(commands, struct {
-			title string
-			cmd   string
-		}{
-			title: getTabTitle(task),
-			cmd:   cmd,
-		})
-	}
-
-	if len(commands) == 0 {
+	if len(project.Tasks) == 0 {
 		return fmt.Errorf("no tasks defined for project %s", project.Name)
 	}
 
-	// Try to find kitty socket
-	socket := os.Getenv("KITTY_LISTEN_ON")
-	if socket == "" {
-		// Fallback to common socket location
-		socket = "unix:/tmp/kitty"
+	socket, err := findKittySocket()
+	if err != nil {
+		return err
 	}
 
-	// Try remote control first
-	if err := openWithRemoteControl(socket, commands); err == nil {
-		return nil
-	}
+	for _, task := range project.Tasks {
+		title := getTabTitle(task)
 
-	// Fallback: launch new kitty window with session
-	return openNewKittyWindow(project.Name, commands)
-}
-
-func openWithRemoteControl(socket string, commands []struct{ title, cmd string }) error {
-	for _, c := range commands {
-		// All tabs: add to current window
-		args := []string{
-			"@", "--to", socket,
-			"launch", "--type=tab", "--title", c.title,
-			"bash", "-ic", c.cmd,
+		var launchErr error
+		if useDocker {
+			projectDir := fmt.Sprintf("%s/%s", strings.TrimSuffix(dockerPath, "/"), project.Name)
+			launchErr = launchDockerTab(socket, title, cfg.Container, projectDir, task)
+		} else {
+			launchErr = launchLocalTab(socket, title, project.Path, task)
 		}
 
-		cmd := exec.Command("kitty", args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to create tab '%s': %w", c.title, err)
+		if launchErr != nil {
+			return fmt.Errorf("failed to create tab for '%s': %w", task, launchErr)
 		}
 
-		// Small delay to ensure tabs are created in order
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	return nil
 }
 
-func openNewKittyWindow(projectName string, commands []struct{ title, cmd string }) error {
-	if len(commands) == 0 {
-		return nil
-	}
-
-	// Create a temporary session file
-	var sessionContent strings.Builder
-	for _, c := range commands {
-		sessionContent.WriteString(fmt.Sprintf("new_tab %s\n", c.title))
-		escapedCmd := strings.ReplaceAll(c.cmd, "'", "'\\''")
-		sessionContent.WriteString(fmt.Sprintf("launch bash -ic '%s'\n", escapedCmd))
-	}
-
-	// Write session file
-	tmpFile := fmt.Sprintf("/tmp/charon-session-%d.conf", time.Now().UnixNano())
-	if err := os.WriteFile(tmpFile, []byte(sessionContent.String()), 0644); err != nil {
-		return fmt.Errorf("failed to write session file: %w", err)
-	}
-
-	// Launch kitty with session
+func sendTextToWindow(socket string, windowID int, text string) error {
 	args := []string{
-		"--session", tmpFile,
-		"--title", projectName,
+		"@", "--to", socket,
+		"send-text", "--match", fmt.Sprintf("id:%d", windowID),
+		text,
 	}
-
 	cmd := exec.Command("kitty", args...)
-	if err := cmd.Start(); err != nil {
-		os.Remove(tmpFile)
-		return fmt.Errorf("failed to launch kitty: %w", err)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func launchLocalTab(socket, title, path, task string) error {
+	launchArgs := []string{
+		"@", "--to", socket,
+		"launch", "--type=tab", "--tab-title", title,
+		"--cwd", path,
 	}
 
-	// Clean up session file after a delay
-	go func() {
-		time.Sleep(2 * time.Second)
-		os.Remove(tmpFile)
-	}()
+	cmd := exec.Command("kitty", launchArgs...)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to launch tab: %w", err)
+	}
 
-	return nil
+	windowID, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil {
+		return fmt.Errorf("failed to parse window ID: %w", err)
+	}
+
+	// Wait for shell to initialize
+	time.Sleep(500 * time.Millisecond)
+
+	// Send cd command
+	if err := sendTextToWindow(socket, windowID, fmt.Sprintf("cd %s\n", path)); err != nil {
+		return err
+	}
+
+	// Wait for cd to complete
+	time.Sleep(300 * time.Millisecond)
+
+	// Send task command
+	return sendTextToWindow(socket, windowID, task+"\n")
+}
+
+func launchDockerTab(socket, title, container, projectDir, task string) error {
+	launchArgs := []string{
+		"@", "--to", socket,
+		"launch", "--type=tab", "--tab-title", title,
+		"docker", "exec", "-it", "-w", projectDir, container,
+		"sh", "-c", "exec $SHELL",
+	}
+
+	cmd := exec.Command("kitty", launchArgs...)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to launch tab: %w", err)
+	}
+
+	windowID, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil {
+		return fmt.Errorf("failed to parse window ID: %w", err)
+	}
+
+	// Wait for docker exec and shell to initialize
+	time.Sleep(2000 * time.Millisecond)
+
+	// Send cd command
+	if err := sendTextToWindow(socket, windowID, fmt.Sprintf("cd %s\n", projectDir)); err != nil {
+		return err
+	}
+
+	// Wait for cd to complete
+	time.Sleep(500 * time.Millisecond)
+
+	// Send task command
+	return sendTextToWindow(socket, windowID, task+"\n")
 }
 
 func getTabTitle(task string) string {
 	task = strings.TrimSpace(task)
 
 	switch {
-	case strings.HasPrefix(task, "git"):
+	case strings.HasPrefix(task, "lazygit"):
 		return "git"
 	case strings.HasPrefix(task, "vim") || strings.HasPrefix(task, "nvim"):
 		return "editor"

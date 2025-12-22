@@ -26,9 +26,6 @@ jobs:
           - goos: darwin
             goarch: arm64
             suffix: darwin-arm64
-          - goos: windows
-            goarch: amd64
-            suffix: windows-amd64.exe
 
     steps:
       - name: Checkout code
@@ -43,8 +40,9 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
         run: |
-          go build -ldflags="-s -w" -o charon-${{ matrix.suffix }} .
+          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -o charon-${{ matrix.suffix }} .
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
@@ -52,3 +50,96 @@ jobs:
           files: charon-${{ matrix.suffix }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  homebrew:
+    name: Update Homebrew formula
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get release info
+        id: release
+        run: |
+          echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "version_num=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Wait for release assets
+        run: sleep 30
+
+      - name: Download binaries for SHA
+        run: |
+          curl -L "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-darwin-arm64" -o charon-darwin-arm64
+          curl -L "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-darwin-amd64" -o charon-darwin-amd64
+          curl -L "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-linux-amd64" -o charon-linux-amd64
+          curl -L "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-linux-arm64" -o charon-linux-arm64
+
+      - name: Calculate SHA256
+        id: sha
+        run: |
+          echo "darwin_arm64=$(sha256sum charon-darwin-arm64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "darwin_amd64=$(sha256sum charon-darwin-amd64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux_amd64=$(sha256sum charon-linux-amd64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux_arm64=$(sha256sum charon-linux-arm64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Generate Homebrew formula
+        run: |
+          cat > charon.rb << 'FORMULA'
+          class Charon < Formula
+            desc "TUI project opener for Kitty terminal with Docker support"
+            homepage "https://github.com/crixuamg/charon"
+            version "${{ steps.release.outputs.version_num }}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-darwin-arm64"
+                sha256 "${{ steps.sha.outputs.darwin_arm64 }}"
+              end
+              on_intel do
+                url "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-darwin-amd64"
+                sha256 "${{ steps.sha.outputs.darwin_amd64 }}"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-linux-arm64"
+                sha256 "${{ steps.sha.outputs.linux_arm64 }}"
+              end
+              on_intel do
+                url "https://github.com/crixuamg/charon/releases/download/${{ github.ref_name }}/charon-linux-amd64"
+                sha256 "${{ steps.sha.outputs.linux_amd64 }}"
+              end
+            end
+
+            def install
+              bin.install Dir["charon-*"].first => "charon"
+            end
+
+            test do
+              assert_match "charon", shell_output("#{bin}/charon --help 2>&1", 0)
+            end
+          end
+          FORMULA
+          # Replace placeholders with actual values
+          sed -i "s/\${{ steps.release.outputs.version_num }}/${{ steps.release.outputs.version_num }}/g" charon.rb
+          sed -i "s/\${{ github.ref_name }}/${{ github.ref_name }}/g" charon.rb
+          sed -i "s/\${{ steps.sha.outputs.darwin_arm64 }}/${{ steps.sha.outputs.darwin_arm64 }}/g" charon.rb
+          sed -i "s/\${{ steps.sha.outputs.darwin_amd64 }}/${{ steps.sha.outputs.darwin_amd64 }}/g" charon.rb
+          sed -i "s/\${{ steps.sha.outputs.linux_arm64 }}/${{ steps.sha.outputs.linux_arm64 }}/g" charon.rb
+          sed -i "s/\${{ steps.sha.outputs.linux_amd64 }}/${{ steps.sha.outputs.linux_amd64 }}/g" charon.rb
+
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/crixuamg/homebrew-charon.git tap
+          cp charon.rb tap/Formula/charon.rb
+          cd tap
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Formula/charon.rb
+          git commit -m "Update charon to ${{ github.ref_name }}" || echo "No changes"
+          git push
