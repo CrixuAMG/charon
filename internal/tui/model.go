@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/db"
 	"github.com/crixuamg/charon/internal/kitty"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -12,171 +13,106 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type viewState int
-
-const (
-	stateList viewState = iota
-	stateAdd
-	stateEdit
-	stateDelete
-)
-
-// Colors - Catppuccin Mocha inspired
-var (
-	colorSurface  = lipgloss.Color("#313244")
-	colorOverlay  = lipgloss.Color("#45475a")
-	colorText     = lipgloss.Color("#cdd6f4")
-	colorSubtext  = lipgloss.Color("#a6adc8")
-	colorLavender = lipgloss.Color("#b4befe")
-	colorBlue     = lipgloss.Color("#89b4fa")
-	colorGreen    = lipgloss.Color("#a6e3a1")
-	colorPeach    = lipgloss.Color("#fab387")
-	colorRed      = lipgloss.Color("#f38ba8")
-)
-
-// Styles
-var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colorLavender).
-			MarginBottom(1)
-
-	subtitleStyle = lipgloss.NewStyle().
-			Foreground(colorSubtext).
-			MarginBottom(2)
-
-	projectStyle = lipgloss.NewStyle().
-			Padding(1, 2).
-			MarginBottom(1).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorOverlay)
-
-	selectedProjectStyle = lipgloss.NewStyle().
-				Padding(1, 2).
-				MarginBottom(1).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(colorLavender).
-				Background(colorSurface)
-
-	projectNameStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(colorText)
-
-	selectedProjectNameStyle = lipgloss.NewStyle().
-					Bold(true).
-					Foreground(colorLavender)
-
-	pathStyle = lipgloss.NewStyle().
-			Foreground(colorSubtext)
-
-	dockerBadgeStyle = lipgloss.NewStyle().
-				Foreground(colorBlue).
-				Bold(true)
-
-	localBadgeStyle = lipgloss.NewStyle().
-			Foreground(colorGreen).
-			Bold(true)
-
-	taskStyle = lipgloss.NewStyle().
-			Foreground(colorPeach)
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(colorSubtext).
-			MarginTop(1)
-
-	errorStyle = lipgloss.NewStyle().
-			Foreground(colorRed).
-			Bold(true).
-			MarginTop(1)
-
-	successStyle = lipgloss.NewStyle().
-			Foreground(colorGreen).
-			Bold(true).
-			MarginTop(1)
-
-	containerStyle = lipgloss.NewStyle().
-			Padding(2, 4)
-
-	formLabelStyle = lipgloss.NewStyle().
-			Foreground(colorLavender).
-			Bold(true).
-			Width(12)
-
-	formStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorLavender).
-			Padding(1, 2).
-			MarginTop(1)
-
-	deleteBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorRed).
-			Padding(1, 2).
-			MarginTop(1)
-)
-
 type Model struct {
-	config     *config.Config
-	cursor     int
-	message    string
-	isError    bool
-	width      int
-	height     int
-	quitting   bool
-	state      viewState
-	formInputs []textinput.Model
-	formFocus  int
-	editIndex  int
+	config        *config.Config
+	db            *db.DB
+	cursor        int
+	message       string
+	isError       bool
+	width         int
+	height        int
+	quitting      bool
+	state         viewState
+	formInputs    []textinput.Model
+	formFocus     int
+	editIndex     int
+	searchQuery   string
+	searchMode    bool
+	currentSort   sortMode
+	currentFilter filterMode
+	styles        Styles
+	keys          keyMap
 }
 
 func NewModel(cfg *config.Config) Model {
+	theme := getTheme(cfg.Theme)
+	database, err := db.Open()
+	if err != nil {
+		database = nil
+	}
+
 	return Model{
-		config: cfg,
-		cursor: 0,
-		state:  stateList,
+		config:        cfg,
+		db:            database,
+		cursor:        0,
+		state:         stateList,
+		currentSort:   sortByCustom,
+		currentFilter: filterNone,
+		styles:        NewStyles(theme),
+		keys:          defaultKeyMap(),
+	}
+}
+
+func getTheme(themeName string) Theme {
+	switch strings.ToLower(themeName) {
+	case "gruvbox":
+		return GruvboxTheme()
+	case "tokyonight", "tokyo-night":
+		return TokyoNightTheme()
+	default:
+		return DefaultTheme()
 	}
 }
 
 func (m *Model) initFormInputs(project *config.Project) {
 	m.formInputs = make([]textinput.Model, 4)
 
-	// Name input
-	m.formInputs[0] = textinput.New()
-	m.formInputs[0].Placeholder = "project-name"
-	m.formInputs[0].CharLimit = 50
-	m.formInputs[0].Width = 40
-
-	// Path input
-	m.formInputs[1] = textinput.New()
-	m.formInputs[1].Placeholder = "~/path/to/project"
-	m.formInputs[1].CharLimit = 200
-	m.formInputs[1].Width = 40
-
-	// Docker path input
-	m.formInputs[2] = textinput.New()
-	m.formInputs[2].Placeholder = "/var/www/html (leave empty for local)"
-	m.formInputs[2].CharLimit = 200
-	m.formInputs[2].Width = 40
-
-	// Tasks input
-	m.formInputs[3] = textinput.New()
-	m.formInputs[3].Placeholder = "echo 'Hello World'; pwd;"
-	m.formInputs[3].CharLimit = 500
-	m.formInputs[3].Width = 40
+	inputs := []struct {
+		placeholder string
+		charLimit   int
+		value       string
+	}{
+		{"project-name", 50, ""},
+		{"~/path/to/project", 200, ""},
+		{"/var/www/html (leave empty for local)", 200, ""},
+		{"echo 'Hello World'; pwd;", 500, ""},
+	}
 
 	if project != nil {
-		m.formInputs[0].SetValue(project.Name)
-		m.formInputs[1].SetValue(project.Path)
-		m.formInputs[2].SetValue(project.DockerPath)
-		m.formInputs[3].SetValue(strings.Join(project.Tasks, ", "))
+		inputs[0].value = project.Name
+		inputs[1].value = project.Path
+		inputs[2].value = project.DockerPath
+		inputs[3].value = strings.Join(project.Tasks, ", ")
+	}
+
+	for i, cfg := range inputs {
+		m.formInputs[i] = textinput.New()
+		m.formInputs[i].Placeholder = cfg.placeholder
+		m.formInputs[i].CharLimit = cfg.charLimit
+		m.formInputs[i].Width = 40
+		if cfg.value != "" {
+			m.formInputs[i].SetValue(cfg.value)
+		}
 	}
 
 	m.formFocus = 0
 	m.formInputs[0].Focus()
 }
 
+func (m Model) getFilteredProjects() []projectWithIndex {
+	filtered := filterProjects(m.config.Projects, m.config, m.currentFilter, m.searchQuery)
+	sortProjects(filtered, m.currentSort, m.db)
+	return filtered
+}
+
 func (m Model) Init() tea.Cmd {
 	return nil
+}
+
+func (m *Model) Cleanup() {
+	if m.db != nil {
+		m.db.Close()
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -201,64 +137,88 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.searchMode {
+		return m.updateSearch(msg)
+	}
+
+	filtered := m.getFilteredProjects()
+
 	switch {
-	case key.Matches(msg, key.NewBinding(key.WithKeys("q", "ctrl+c"))):
+	case key.Matches(msg, m.keys.Quit):
 		m.quitting = true
 		return m, tea.Quit
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("up", "k"))):
+	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
 		}
 		m.message = ""
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("down", "j"))):
-		if m.cursor < len(m.config.Projects)-1 {
+	case key.Matches(msg, m.keys.Down):
+		if m.cursor < len(filtered)-1 {
 			m.cursor++
 		}
 		m.message = ""
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("enter", " "))):
-		if len(m.config.Projects) > 0 {
-			project := m.config.Projects[m.cursor]
-			err := kitty.OpenProject(project, m.config)
-			if err != nil {
+	case key.Matches(msg, m.keys.Enter):
+		if len(filtered) > 0 {
+			project := filtered[m.cursor].project
+			if err := kitty.OpenProject(project, m.config); err != nil {
 				m.message = "Error: " + err.Error()
 				m.isError = true
 			} else {
+				if m.db != nil {
+					_ = m.db.RecordAccess(project.Name)
+				}
 				m.quitting = true
 				return m, tea.Quit
 			}
 		}
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("a"))):
+	case key.Matches(msg, m.keys.Search):
+		m.searchMode = true
+		m.searchQuery = ""
+		m.cursor = 0
+		m.message = ""
+
+	case key.Matches(msg, m.keys.Sort):
+		m.currentSort = (m.currentSort + 1) % 3
+		m.cursor = 0
+		m.message = ""
+
+	case key.Matches(msg, m.keys.Filter):
+		m.currentFilter = (m.currentFilter + 1) % 3
+		m.cursor = 0
+		m.message = ""
+
+	case key.Matches(msg, m.keys.Add):
 		m.state = stateAdd
 		m.initFormInputs(nil)
 		m.message = ""
 		return m, textinput.Blink
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("e"))):
-		if len(m.config.Projects) > 0 {
+	case key.Matches(msg, m.keys.Edit):
+		if len(filtered) > 0 {
 			m.state = stateEdit
-			m.editIndex = m.cursor
-			m.initFormInputs(&m.config.Projects[m.cursor])
+			m.editIndex = getOriginalIndex(filtered, m.cursor)
+			m.initFormInputs(&m.config.Projects[m.editIndex])
 			m.message = ""
 			return m, textinput.Blink
 		}
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("d", "x"))):
-		if len(m.config.Projects) > 0 {
+	case key.Matches(msg, m.keys.Delete):
+		if len(filtered) > 0 {
 			m.state = stateDelete
 			m.message = ""
 		}
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("g", "home"))):
+	case key.Matches(msg, m.keys.First):
 		m.cursor = 0
 		m.message = ""
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("G", "end"))):
-		if len(m.config.Projects) > 0 {
-			m.cursor = len(m.config.Projects) - 1
+	case key.Matches(msg, m.keys.Last):
+		if len(filtered) > 0 {
+			m.cursor = len(filtered) - 1
 		}
 		m.message = ""
 	}
@@ -266,19 +226,48 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.searchMode = false
+		m.searchQuery = ""
+		m.cursor = 0
+		return m, nil
+
+	case tea.KeyEnter:
+		m.searchMode = false
+		m.cursor = 0
+		return m, nil
+
+	case tea.KeyBackspace:
+		if len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+			m.cursor = 0
+		} else {
+			m.searchMode = false
+		}
+
+	case tea.KeyRunes:
+		m.searchQuery += string(msg.Runes)
+		m.cursor = 0
+	}
+
+	return m, nil
+}
+
 func (m Model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+	case key.Matches(msg, m.keys.Cancel):
 		m.state = stateList
 		return m, nil
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("tab", "down"))):
+	case key.Matches(msg, m.keys.NextField):
 		m.formInputs[m.formFocus].Blur()
 		m.formFocus = (m.formFocus + 1) % len(m.formInputs)
 		m.formInputs[m.formFocus].Focus()
 		return m, textinput.Blink
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab", "up"))):
+	case key.Matches(msg, m.keys.PrevField):
 		m.formInputs[m.formFocus].Blur()
 		m.formFocus--
 		if m.formFocus < 0 {
@@ -287,11 +276,10 @@ func (m Model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.formInputs[m.formFocus].Focus()
 		return m, textinput.Blink
 
-	case key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+s"))):
+	case key.Matches(msg, m.keys.Save):
 		return m.saveProject()
 	}
 
-	// Update the focused input
 	var cmd tea.Cmd
 	m.formInputs[m.formFocus], cmd = m.formInputs[m.formFocus].Update(msg)
 	return m, cmd
@@ -309,12 +297,10 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Parse tasks
 	var tasks []string
 	if tasksStr != "" {
 		for _, t := range strings.Split(tasksStr, ",") {
-			t = strings.TrimSpace(t)
-			if t != "" {
+			if t = strings.TrimSpace(t); t != "" {
 				tasks = append(tasks, t)
 			}
 		}
@@ -334,7 +320,6 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 		m.config.Projects[m.editIndex] = project
 	}
 
-	// Save to file
 	if err := config.Save(m.config); err != nil {
 		m.message = "Error saving: " + err.Error()
 		m.isError = true
@@ -348,24 +333,27 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	filtered := m.getFilteredProjects()
+
 	switch {
 	case key.Matches(msg, key.NewBinding(key.WithKeys("y", "enter"))):
-		// Delete the project
-		m.config.Projects = append(
-			m.config.Projects[:m.cursor],
-			m.config.Projects[m.cursor+1:]...,
-		)
-		if m.cursor >= len(m.config.Projects) && m.cursor > 0 {
-			m.cursor--
-		}
+		if m.cursor < len(filtered) {
+			originalIdx := getOriginalIndex(filtered, m.cursor)
+			m.config.Projects = append(
+				m.config.Projects[:originalIdx],
+				m.config.Projects[originalIdx+1:]...,
+			)
+			if m.cursor >= len(m.config.Projects) && m.cursor > 0 {
+				m.cursor--
+			}
 
-		// Save to file
-		if err := config.Save(m.config); err != nil {
-			m.message = "Error saving: " + err.Error()
-			m.isError = true
-		} else {
-			m.message = "Project deleted"
-			m.isError = false
+			if err := config.Save(m.config); err != nil {
+				m.message = "Error saving: " + err.Error()
+				m.isError = true
+			} else {
+				m.message = "Project deleted"
+				m.isError = false
+			}
 		}
 		m.state = stateList
 
@@ -381,165 +369,43 @@ func (m Model) View() string {
 		return ""
 	}
 
-	var b strings.Builder
-
-	// Header
-	b.WriteString(titleStyle.Render(">>> Charon"))
-	b.WriteString("\n")
-	b.WriteString(subtitleStyle.Render("Navigate to your projects"))
-	b.WriteString("\n")
-
-	switch m.state {
-	case stateList:
-		b.WriteString(m.viewList())
-	case stateAdd:
-		b.WriteString(m.viewForm("Add New Project"))
-	case stateEdit:
-		b.WriteString(m.viewForm("Edit Project"))
-	case stateDelete:
-		b.WriteString(m.viewDelete())
-	}
-
-	return containerStyle.Render(b.String())
-}
-
-func (m Model) viewList() string {
-	var b strings.Builder
-
-	if len(m.config.Projects) == 0 {
-		b.WriteString(pathStyle.Render("No projects configured. Press 'a' to add one."))
-		b.WriteString("\n")
-	} else {
-		for i, project := range m.config.Projects {
-			isSelected := i == m.cursor
-			b.WriteString(m.renderProject(project, isSelected))
-			b.WriteString("\n")
-		}
-	}
-
-	// Message
-	if m.message != "" {
-		if m.isError {
-			b.WriteString(errorStyle.Render(m.message))
-		} else {
-			b.WriteString(successStyle.Render(m.message))
-		}
-		b.WriteString("\n")
-	}
-
-	// Help at bottom
-	help := []string{
-		"j/k navigate",
-		"enter open",
-		"a add",
-		"e edit",
-		"d delete",
-		"q quit",
-	}
-	b.WriteString(helpStyle.Render(strings.Join(help, " | ")))
-
-	return b.String()
-}
-
-func (m Model) viewForm(title string) string {
-	var b strings.Builder
-
-	b.WriteString(projectNameStyle.Render(title))
-	b.WriteString("\n\n")
-
-	labels := []string{"Name:", "Path:", "Docker:", "Tasks:"}
-	for i, input := range m.formInputs {
-		label := formLabelStyle.Render(labels[i])
-		b.WriteString(label + input.View())
-		b.WriteString("\n")
-	}
-
-	formContent := formStyle.Render(b.String())
-
-	var footer strings.Builder
-	footer.WriteString(formContent)
-	footer.WriteString("\n")
-
-	// Message
-	if m.message != "" {
-		if m.isError {
-			footer.WriteString(errorStyle.Render(m.message))
-		}
-		footer.WriteString("\n")
-	}
-
-	// Help at bottom
-	help := helpStyle.Render("tab next | shift+tab prev | ctrl+s save | esc cancel")
-	footer.WriteString(help)
-
-	return footer.String()
-}
-
-func (m Model) viewDelete() string {
-	var b strings.Builder
-
-	if m.cursor < len(m.config.Projects) {
-		project := m.config.Projects[m.cursor]
-		b.WriteString(deleteBoxStyle.Render(
-			"Delete project '" + project.Name + "'?\n\n" +
-				"This cannot be undone.",
-		))
-	}
-
-	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("y confirm | n cancel"))
-
-	return b.String()
-}
-
-func (m Model) renderProject(project config.Project, selected bool) string {
 	var content strings.Builder
 
-	// Project name with icon
-	nameStyle := projectNameStyle
-	if selected {
-		nameStyle = selectedProjectNameStyle
+	content.WriteString(m.styles.Title.Render("⚡ Charon"))
+	content.WriteString(" ")
+	content.WriteString(m.styles.Subtitle.Render("Project Navigator"))
+	content.WriteString("\n\n")
+
+	var mainContent string
+	switch m.state {
+	case stateList:
+		mainContent = m.viewList()
+	case stateAdd:
+		mainContent = m.viewForm("Add New Project")
+	case stateEdit:
+		mainContent = m.viewForm("Edit Project")
+	case stateDelete:
+		mainContent = m.viewDelete()
 	}
 
-	icon := "[L] "
-	if project.DockerPath != "" || m.config.DockerPath != "" {
-		icon = "[D] "
+	content.WriteString(mainContent)
+
+	helpBar := m.renderHelpBar()
+
+	// Calculate available height for content
+	headerHeight := 2 // Title + spacing
+	helpHeight := lipgloss.Height(helpBar)
+	containerPadding := 2 // top + bottom padding
+	availableHeight := m.height - headerHeight - helpHeight - containerPadding
+
+	// Add spacing to push help bar to bottom
+	currentHeight := lipgloss.Height(mainContent)
+	if currentHeight < availableHeight {
+		content.WriteString(strings.Repeat("\n", availableHeight-currentHeight))
 	}
 
-	name := nameStyle.Render(icon + project.Name)
-	content.WriteString(name)
 	content.WriteString("\n")
+	content.WriteString(helpBar)
 
-	// Path info
-	var pathInfo string
-	if project.DockerPath != "" {
-		pathInfo = dockerBadgeStyle.Render("docker") + " " + pathStyle.Render(project.DockerPath+"/"+project.Name)
-	} else if m.config.DockerPath != "" {
-		pathInfo = dockerBadgeStyle.Render("docker") + " " + pathStyle.Render(m.config.DockerPath+"/"+project.Name)
-	} else {
-		pathInfo = localBadgeStyle.Render("local") + " " + pathStyle.Render(project.Path)
-	}
-	content.WriteString(pathInfo)
-	content.WriteString("\n")
-
-	// Tasks
-	if len(project.Tasks) > 0 {
-		tasks := make([]string, len(project.Tasks))
-		for i, t := range project.Tasks {
-			if len(t) > 20 {
-				t = t[:17] + "..."
-			}
-			tasks[i] = t
-		}
-		taskLine := taskStyle.Render(">> " + strings.Join(tasks, " | "))
-		content.WriteString(taskLine)
-	}
-
-	// Apply container style
-	style := projectStyle
-	if selected {
-		style = selectedProjectStyle
-	}
-
-	return style.Render(content.String())
+	return m.styles.Container.Render(content.String())
 }

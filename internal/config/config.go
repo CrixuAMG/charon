@@ -18,6 +18,7 @@ type Project struct {
 type Config struct {
 	DockerPath string    `yaml:"docker_path"`
 	Container  string    `yaml:"container"`
+	Theme      string    `yaml:"theme"`
 	Projects   []Project `yaml:"projects"`
 }
 

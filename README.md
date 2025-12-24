@@ -11,6 +11,12 @@ A TUI project opener for Kitty terminal with Docker support. Named after the fer
 - **Docker Support** - Run commands inside Docker containers
 - **Kitty Integration** - Opens projects in new tabs in your current Kitty window
 - **Multiple Tasks** - Each project can have multiple tasks, each opening in its own tab
+- **Fuzzy Search** - Quickly find projects by typing `/` and searching
+- **Filtering** - Filter projects by Docker or Local
+- **Sorting** - Sort projects by name, recently used, or custom order
+- **Usage Tracking** - Automatically tracks project access in SQLite database
+- **Recent Projects** - Sort by recently accessed projects
+- **Themes** - Choose from multiple color themes (Catppuccin Mocha, Gruvbox, Tokyo Night)
 - **Persistent Config** - Projects are saved to a YAML config file
 - **Shell Agnostic** - Works with bash, zsh, nushell, and other shells
 
@@ -73,12 +79,22 @@ Restart Kitty after making these changes.
 
 Charon reads its configuration from `~/.config/charon/.charon.yaml`.
 
+### Usage Tracking
+
+Charon automatically tracks project access in a SQLite database located at `~/.config/charon/charon.db`. This enables:
+- Sorting by recently accessed projects
+- Tracking access counts
+- Future analytics features
+
+The database is created automatically on first run and requires no manual setup.
+
 ### Example Configuration
 
 ```yaml
 # Global settings
 docker_path: /var/www/html    # Default Docker path for projects
 container: my-container       # Docker container name
+theme: catppuccin             # Theme: catppuccin (default), gruvbox, tokyonight
 
 # Projects
 projects:
@@ -105,6 +121,7 @@ projects:
 |-------|-------------|
 | `docker_path` | Global default path inside Docker container |
 | `container` | Docker container name for `docker exec` |
+| `theme` | Color theme: `catppuccin` (default), `gruvbox`, `tokyonight` |
 | `projects` | Array of project configurations |
 
 ### Project Fields
@@ -128,22 +145,34 @@ charon
 
 | Key | Action |
 |-----|--------|
-| `j` / `?` | Move down |
-| `k` / `?` | Move up |
+| `j` / `↓` | Move down |
+| `k` / `↑` | Move up |
 | `g` / `Home` | Go to first project |
 | `G` / `End` | Go to last project |
 | `Enter` / `Space` | Open project (creates tabs) |
+| `/` | Search projects (fuzzy search) |
+| `s` | Cycle sort mode (Name → Recent → Custom) |
+| `f` | Cycle filter (All → Docker → Local) |
 | `a` | Add new project |
 | `e` | Edit selected project |
 | `d` / `x` | Delete selected project |
 | `q` / `Ctrl+C` | Quit |
 
+#### Search Mode
+
+| Key | Action |
+|-----|--------|
+| Type characters | Search for projects |
+| `Enter` | Accept search and return to list |
+| `Esc` | Clear search and return to list |
+| `Backspace` | Delete last character (or exit if empty) |
+
 #### Form View (Add/Edit)
 
 | Key | Action |
 |-----|--------|
-| `Tab` / `?` | Next field |
-| `Shift+Tab` / `?` | Previous field |
+| `Tab` / `↓` | Next field |
+| `Shift+Tab` / `↑` | Previous field |
 | `Ctrl+S` | Save project |
 | `Esc` | Cancel |
 

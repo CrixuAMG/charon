@@ -1,0 +1,51 @@
+# Charon Configuration Example
+# Copy this file to ~/.config/charon/.charon.yaml and customize it
+
+# Global Docker settings (optional)
+docker_path: /var/www/html
+container: dev-container
+
+# Theme selection (optional)
+# Available themes: catppuccin (default), gruvbox, tokyonight
+theme: catppuccin
+
+# Projects list
+projects:
+  # Docker-based web project
+  - name: web-app
+    path: ~/projects/web-app
+    docker_path: /var/www/html
+    tasks:
+      - lazygit
+      - nvim
+      - yarn dev
+      - yarn test
+
+  # Local Go project
+  - name: go-service
+    path: ~/projects/go-service
+    docker_path: ""  # Empty means local project
+    tasks:
+      - lazygit
+      - nvim
+      - go run main.go
+      - go test ./...
+
+  # PHP project with custom Docker path
+  - name: php-api
+    path: ~/projects/php-api
+    docker_path: /app
+    tasks:
+      - lazygit
+      - nvim
+      - composer install
+      - php artisan serve
+
+  # Simple local project
+  - name: scripts
+    path: ~/scripts
+    docker_path: ""
+    tasks:
+      - nvim
+      - ls -la
+
