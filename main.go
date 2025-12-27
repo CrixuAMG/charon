@@ -23,7 +23,7 @@ func main() {
 	defer model.Cleanup()
 
 	// If the user called charon with an argument, like `charon project` we will attempt to open that project or exit with an error
-	if (len(os.Args) == 2) {
+	if len(os.Args) == 2 {
 		project := os.Args[1]
 
 		projectCfg, err := cfg.FindProject(project)
