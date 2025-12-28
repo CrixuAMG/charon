@@ -14,11 +14,11 @@ type Project struct {
 	DockerPath string   `yaml:"docker_path"`
 	Tasks      []string `yaml:"tasks"`
 
-	Exists 	   bool     `yaml:"-"`
+	Exists bool `yaml:"-"`
 }
 
 type Scan struct {
-	Paths      []string
+	Paths []string
 }
 
 type Config struct {
@@ -26,7 +26,7 @@ type Config struct {
 	Container  string    `yaml:"container"`
 	Theme      string    `yaml:"theme"`
 	Projects   []Project `yaml:"projects"`
-	Scan	   Scan      `yaml:"scan"`
+	Scan       Scan      `yaml:"scan"`
 }
 
 func getConfigPath() (string, error) {
@@ -152,4 +152,3 @@ func ProjectFromPath(path string) Project {
 		Path: path,
 	}
 }
-

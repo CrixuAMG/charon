@@ -40,4 +40,3 @@ func UpdateProjectStatus(cfg *config.Config) {
 		cfg.Projects[i].Exists = err == nil
 	}
 }
-

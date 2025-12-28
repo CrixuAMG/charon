@@ -26,4 +26,3 @@ func Scan(paths []string) ([]string, error) {
 
 	return found, nil
 }
-
