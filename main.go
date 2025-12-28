@@ -18,6 +18,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	app.AutoDiscover(cfg)
+	app.UpdateProjectStatus(cfg)
+
 	ctx := &app.Context{
 		Config: cfg,
 	}

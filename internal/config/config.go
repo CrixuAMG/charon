@@ -13,6 +13,12 @@ type Project struct {
 	Path       string   `yaml:"path"`
 	DockerPath string   `yaml:"docker_path"`
 	Tasks      []string `yaml:"tasks"`
+
+	Exists bool `yaml:"-"`
+}
+
+type Scan struct {
+	Paths []string
 }
 
 type Config struct {
@@ -20,6 +26,7 @@ type Config struct {
 	Container  string    `yaml:"container"`
 	Theme      string    `yaml:"theme"`
 	Projects   []Project `yaml:"projects"`
+	Scan       Scan      `yaml:"scan"`
 }
 
 func getConfigPath() (string, error) {
@@ -53,6 +60,10 @@ func Load() (*Config, error) {
 	// Expand ~ in paths
 	for i := range cfg.Projects {
 		cfg.Projects[i].Path = expandPath(cfg.Projects[i].Path)
+	}
+
+	for i := range cfg.Scan.Paths {
+		cfg.Scan.Paths[i] = expandPath(cfg.Scan.Paths[i])
 	}
 
 	return &cfg, nil
@@ -119,4 +130,25 @@ func (c *Config) FindProject(name string) (*Project, error) {
 		}
 	}
 	return nil, fmt.Errorf("project %q not found", name)
+}
+
+func (c *Config) HasProjectPath(path string) bool {
+	for _, project := range c.Projects {
+		if project.Path == path {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Config) AddProject(p Project) {
+	c.Projects = append(c.Projects, p)
+}
+
+func ProjectFromPath(path string) Project {
+	return Project{
+		Name: filepath.Base(path),
+		Path: path,
+	}
 }
