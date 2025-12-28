@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/tasks"
 )
 
 func (m Model) viewList() string {
@@ -158,16 +159,18 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 	}
 	content.WriteString(pathInfo)
 
-	if len(project.Tasks) > 0 {
+	tasks := tasks.EffectiveTasks(project, m.config)
+
+	if len(tasks) > 0 {
 		content.WriteString("\n  ")
-		tasks := make([]string, len(project.Tasks))
-		for i, t := range project.Tasks {
+		tasksList := make([]string, len(tasks))
+		for i, t := range tasks {
 			if len(t) > 25 {
 				t = t[:22] + "..."
 			}
-			tasks[i] = t
+			tasksList[i] = t
 		}
-		taskLine := m.styles.Task.Render(strings.Join(tasks, " • "))
+		taskLine := m.styles.Task.Render(strings.Join(tasksList, " • "))
 		content.WriteString(taskLine)
 	}
 

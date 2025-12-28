@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/tasks"
 )
 
 // findKittySocket finds the kitty socket path
@@ -41,7 +42,9 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 
 	useDocker := dockerPath != ""
 
-	if len(project.Tasks) == 0 {
+	tasks := tasks.EffectiveTasks(project, cfg)
+
+	if len(tasks) == 0 {
 		return fmt.Errorf("no tasks defined for project %s", project.Name)
 	}
 
@@ -50,7 +53,7 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 		return err
 	}
 
-	for _, task := range project.Tasks {
+	for _, task := range tasks {
 		title := getTabTitle(task)
 
 		var launchErr error
@@ -103,14 +106,6 @@ func launchLocalTab(socket, title, path, task string) error {
 
 	// Wait for shell to initialize
 	time.Sleep(500 * time.Millisecond)
-
-	// Send cd command
-	if err := sendTextToWindow(socket, windowID, fmt.Sprintf("cd %s\n", path)); err != nil {
-		return err
-	}
-
-	// Wait for cd to complete
-	time.Sleep(300 * time.Millisecond)
 
 	// Send task command
 	return sendTextToWindow(socket, windowID, task+"\n")
