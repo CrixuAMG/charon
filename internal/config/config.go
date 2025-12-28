@@ -8,11 +8,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type TaskSets struct {
+	Name  string   `yaml:"-"`
+	Tasks []string `yaml:"tasks"`
+}
+
 type Project struct {
 	Name       string   `yaml:"name"`
 	Path       string   `yaml:"path"`
 	DockerPath string   `yaml:"docker_path"`
-	Tasks      []string `yaml:"tasks"`
+	Tasks      []string `yaml:"tasks,omitempty"`
+	TasksFrom  string   `yaml:"tasks_from,omitempty"`
 
 	Exists bool `yaml:"-"`
 }
@@ -22,11 +28,12 @@ type Scan struct {
 }
 
 type Config struct {
-	DockerPath string    `yaml:"docker_path"`
-	Container  string    `yaml:"container"`
-	Theme      string    `yaml:"theme"`
-	Projects   []Project `yaml:"projects"`
-	Scan       Scan      `yaml:"scan"`
+	DockerPath string              `yaml:"docker_path"`
+	Container  string              `yaml:"container"`
+	Theme      string              `yaml:"theme"`
+	Scan       Scan                `yaml:"scan"`
+	Projects   []Project           `yaml:"projects"`
+	TaskSets   map[string][]string `yaml:"task_sets,omitempty"`
 }
 
 func getConfigPath() (string, error) {
