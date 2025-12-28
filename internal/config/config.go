@@ -111,3 +111,12 @@ func contractPath(path string) string {
 	}
 	return path
 }
+
+func (c *Config) FindProject(name string) (*Project, error) {
+	for i := range c.Projects {
+		if c.Projects[i].Name == name {
+			return &c.Projects[i], nil
+		}
+	}
+	return nil, fmt.Errorf("project %q not found", name)
+}

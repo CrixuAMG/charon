@@ -1,28 +1,34 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
+	"github.com/crixuamg/charon/internal/app"
+	"github.com/crixuamg/charon/internal/commands"
 	"github.com/crixuamg/charon/internal/config"
-	"github.com/crixuamg/charon/internal/tui"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
+	log.SetPrefix("charon: ")
+	log.SetFlags(0)
+
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	model := tui.NewModel(cfg)
-	defer model.Cleanup()
+	ctx := &app.Context{
+		Config: cfg,
+	}
 
-	p := tea.NewProgram(model, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error running program: %v\n", err)
-		os.Exit(1)
+	router := commands.NewRouter("tui")
+
+	router.Add(commands.NewOpen())
+	router.Add(commands.NewTUI())
+	router.Add(commands.NewHelp(router))
+
+	if err := router.Run(ctx, os.Args[1:]); err != nil {
+		log.Fatal(err)
 	}
 }

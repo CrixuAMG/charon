@@ -218,4 +218,3 @@ func (m Model) renderHelpBar() string {
 func (m Model) helpItem(key, desc string) string {
 	return m.styles.HelpKey.Render(key) + " " + m.styles.HelpDesc.Render(desc)
 }
-
