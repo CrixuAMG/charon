@@ -18,6 +18,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	app.AutoDiscover(cfg)
+
 	ctx := &app.Context{
 		Config: cfg,
 	}
