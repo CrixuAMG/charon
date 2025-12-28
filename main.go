@@ -19,6 +19,7 @@ func main() {
 	}
 
 	app.AutoDiscover(cfg)
+	app.UpdateProjectStatus(cfg)
 
 	ctx := &app.Context{
 		Config: cfg,

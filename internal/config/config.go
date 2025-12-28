@@ -13,6 +13,8 @@ type Project struct {
 	Path       string   `yaml:"path"`
 	DockerPath string   `yaml:"docker_path"`
 	Tasks      []string `yaml:"tasks"`
+
+	Exists 	   bool     `yaml:"-"`
 }
 
 type Scan struct {
@@ -150,3 +152,4 @@ func ProjectFromPath(path string) Project {
 		Path: path,
 	}
 }
+
