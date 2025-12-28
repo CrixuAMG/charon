@@ -66,31 +66,31 @@ func TokyoNightTheme() Theme {
 
 // Styles holds all lipgloss styles for the TUI
 type Styles struct {
-	Title                lipgloss.Style
-	Subtitle             lipgloss.Style
-	Subtext              lipgloss.Style
-	Project              lipgloss.Style
-	SelectedProject      lipgloss.Style
-	ProjectName          lipgloss.Style
-	SelectedProjectName  lipgloss.Style
-	Path                 lipgloss.Style
-	DockerBadge          lipgloss.Style
-	LocalBadge           lipgloss.Style
-	Task                 lipgloss.Style
-	Help                 lipgloss.Style
-	HelpKey              lipgloss.Style
-	HelpDesc             lipgloss.Style
-	HelpSeparator        lipgloss.Style
-	Error                lipgloss.Style
-	Success              lipgloss.Style
-	Container            lipgloss.Style
-	FormLabel            lipgloss.Style
-	Form                 lipgloss.Style
-	DeleteBox            lipgloss.Style
-	SearchInput          lipgloss.Style
-	FilterBadge          lipgloss.Style
-	StatusBar            lipgloss.Style
-	Count                lipgloss.Style
+	Title               lipgloss.Style
+	Subtitle            lipgloss.Style
+	Subtext             lipgloss.Style
+	Project             lipgloss.Style
+	SelectedProject     lipgloss.Style
+	ProjectName         lipgloss.Style
+	SelectedProjectName lipgloss.Style
+	Path                lipgloss.Style
+	DockerBadge         lipgloss.Style
+	LocalBadge          lipgloss.Style
+	Task                lipgloss.Style
+	Help                lipgloss.Style
+	HelpKey             lipgloss.Style
+	HelpDesc            lipgloss.Style
+	HelpSeparator       lipgloss.Style
+	Error               lipgloss.Style
+	Success             lipgloss.Style
+	Container           lipgloss.Style
+	FormLabel           lipgloss.Style
+	Form                lipgloss.Style
+	DeleteBox           lipgloss.Style
+	SearchInput         lipgloss.Style
+	FilterBadge         lipgloss.Style
+	StatusBar           lipgloss.Style
+	Count               lipgloss.Style
 }
 
 // NewStyles creates a new Styles instance from a theme
@@ -213,4 +213,3 @@ func NewStyles(theme Theme) Styles {
 			Bold(true),
 	}
 }
-

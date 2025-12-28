@@ -18,7 +18,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-
 	ctx := &app.Context{
 		Config: cfg,
 	}

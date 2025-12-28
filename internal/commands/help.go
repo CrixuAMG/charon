@@ -22,7 +22,7 @@ func (c *HelpCommand) Help() string {
 }
 
 func (c *HelpCommand) Run(_ *app.Context, _ []string) error {
-	fmt.Println("Usage: charon <command>\n")
+	fmt.Println("Usage: charon <command>")
 
 	var names []string
 	for name := range c.router.All() {
@@ -35,4 +35,3 @@ func (c *HelpCommand) Run(_ *app.Context, _ []string) error {
 	}
 	return nil
 }
-

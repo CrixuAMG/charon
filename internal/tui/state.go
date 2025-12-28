@@ -50,4 +50,3 @@ func (f filterMode) String() string {
 		return "Unknown"
 	}
 }
-

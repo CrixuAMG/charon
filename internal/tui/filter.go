@@ -100,4 +100,3 @@ func getOriginalIndex(projects []projectWithIndex, cursor int) int {
 	}
 	return projects[cursor].index
 }
-

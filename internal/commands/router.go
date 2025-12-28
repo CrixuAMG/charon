@@ -7,13 +7,13 @@ import (
 )
 
 type Router struct {
-	commands map[string]Command
+	commands   map[string]Command
 	defaultCmd string
 }
 
 func NewRouter(defaultCmd string) *Router {
 	return &Router{
-		commands: make(map[string]Command),
+		commands:   make(map[string]Command),
 		defaultCmd: defaultCmd,
 	}
 }
@@ -41,4 +41,3 @@ func (r *Router) Run(ctx *app.Context, args []string) error {
 func (r *Router) All() map[string]Command {
 	return r.commands
 }
-

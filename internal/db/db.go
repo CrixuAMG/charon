@@ -140,4 +140,3 @@ func (db *DB) GetProjectAccessCount(projectName string) (int, error) {
 	}
 	return count, nil
 }
-
