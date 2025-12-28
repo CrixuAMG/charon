@@ -41,7 +41,9 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 
 	useDocker := dockerPath != ""
 
-	if len(project.Tasks) == 0 {
+	tasks := config.EffectiveTasks(project, cfg)
+
+	if len(tasks) == 0 {
 		return fmt.Errorf("no tasks defined for project %s", project.Name)
 	}
 
@@ -50,7 +52,7 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 		return err
 	}
 
-	for _, task := range project.Tasks {
+	for _, task := range tasks {
 		title := getTabTitle(task)
 
 		var launchErr error

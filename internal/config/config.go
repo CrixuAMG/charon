@@ -159,3 +159,16 @@ func ProjectFromPath(path string) Project {
 		Path: path,
 	}
 }
+
+func EffectiveTasks(p Project, cfg *Config) []string {
+	var tasks []string
+
+	if p.TasksFrom != "" {
+		if base, ok := cfg.TaskSets[p.TasksFrom]; ok {
+			tasks = append(tasks, base...)
+		}
+	}
+
+	tasks = append(tasks, p.Tasks...)
+	return tasks
+}
