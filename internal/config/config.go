@@ -160,15 +160,16 @@ func ProjectFromPath(path string) Project {
 	}
 }
 
-func EffectiveTasks(p Project, cfg *Config) []string {
-	var tasks []string
-
-	if p.TasksFrom != "" {
-		if base, ok := cfg.TaskSets[p.TasksFrom]; ok {
-			tasks = append(tasks, base...)
-		}
+func ConfigPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("get home dir: %w", err)
 	}
 
-	tasks = append(tasks, p.Tasks...)
-	return tasks
+	return filepath.Join(
+		home,
+		".config",
+		"charon",
+		".charon.yaml",
+	), nil
 }

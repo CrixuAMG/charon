@@ -30,6 +30,7 @@ func main() {
 	router.Add(commands.NewOpen())
 	router.Add(commands.NewTUI())
 	router.Add(commands.NewHelp(router))
+	router.Add(commands.NewEdit())
 
 	if err := router.Run(ctx, os.Args[1:]); err != nil {
 		log.Fatal(err)

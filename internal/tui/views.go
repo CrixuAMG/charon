@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/tasks"
 )
 
 func (m Model) viewList() string {
@@ -158,7 +159,7 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 	}
 	content.WriteString(pathInfo)
 
-	tasks := config.EffectiveTasks(project, m.config)
+	tasks := tasks.EffectiveTasks(project, m.config)
 
 	if len(tasks) > 0 {
 		content.WriteString("\n  ")

@@ -1,7 +1,6 @@
 package autodiscover
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -17,7 +16,6 @@ func Scan(paths []string) ([]string, error) {
 
 		for _, entry := range entries {
 			if entry.IsDir() {
-				fmt.Println("DIR:", entry.Name())
 				fullPath := filepath.Join(root, entry.Name())
 				found = append(found, fullPath)
 			}
