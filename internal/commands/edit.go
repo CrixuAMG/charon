@@ -19,7 +19,7 @@ func NewEdit() *EditCommand {
 func (c *EditCommand) Name() string { return "edit" }
 
 func (c *EditCommand) Help() string {
-	return "edit Edit Charon's config file"
+	return "edit 		Edit Charon's config file"
 }
 
 func (c *EditCommand) Run(_ *app.Context, _ []string) error {
