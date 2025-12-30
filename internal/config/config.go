@@ -14,12 +14,12 @@ type TaskSets struct {
 }
 
 type Project struct {
-	Name       string   `yaml:"name"`
-	Pinned     bool     `yaml:"pinned,omitempty"`
-	Path       string   `yaml:"path"`
-	DockerPath string   `yaml:"docker_path"`
-	Tasks      []string `yaml:"tasks,omitempty"`
-	TasksFrom  string   `yaml:"tasks_from,omitempty"`
+	Name      string    `yaml:"name"`
+	Pinned    bool      `yaml:"pinned,omitempty"`
+	Path      string    `yaml:"path"`
+	Execution Execution `yaml:"execution"`
+	Tasks     []string  `yaml:"tasks,omitempty"`
+	TasksFrom string    `yaml:"tasks_from,omitempty"`
 
 	Exists bool `yaml:"-"`
 }
@@ -28,13 +28,17 @@ type Scan struct {
 	Paths []string
 }
 
+type Execution struct {
+	Type      string `yaml:"type,omitempty"`
+	Container string `yaml:"container,omitempty"`
+}
+
 type Config struct {
-	DockerPath string              `yaml:"docker_path"`
-	Container  string              `yaml:"container"`
-	Theme      string              `yaml:"theme"`
-	Scan       Scan                `yaml:"scan"`
-	Projects   []Project           `yaml:"projects"`
-	TaskSets   map[string][]string `yaml:"task_sets,omitempty"`
+	Execution Execution           `yaml:"execution"`
+	Theme     string              `yaml:"theme"`
+	Scan      Scan                `yaml:"scan"`
+	Projects  []Project           `yaml:"projects"`
+	TaskSets  map[string][]string `yaml:"task_sets,omitempty"`
 }
 
 func getConfigPath() (string, error) {
