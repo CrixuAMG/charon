@@ -15,6 +15,7 @@ type TaskSets struct {
 
 type Project struct {
 	Name       string   `yaml:"name"`
+	Pinned     bool     `yaml:"pinned,omitempty"`
 	Path       string   `yaml:"path"`
 	DockerPath string   `yaml:"docker_path"`
 	Tasks      []string `yaml:"tasks,omitempty"`

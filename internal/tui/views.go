@@ -138,14 +138,18 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 
 	warningIcon := ""
 	icon := "○ "
+	pin := ""
 	if project.Exists == false {
 		warningIcon = "⚠ "
 	}
 	if project.DockerPath != "" || m.config.DockerPath != "" {
 		icon = "◆ "
 	}
+	if project.Pinned {
+		pin = "📌 "
+	}
 
-	name := nameStyle.Render(icon + warningIcon + project.Name)
+	name := nameStyle.Render(icon + warningIcon + pin + project.Name)
 	content.WriteString(name)
 	content.WriteString(" ")
 
