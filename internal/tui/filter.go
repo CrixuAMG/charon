@@ -92,6 +92,10 @@ func sortProjects(projects []projectWithIndex, mode sortMode, database *db.DB) {
 	case sortByCustom:
 		// Keep original order from config
 	}
+
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].project.Pinned && !projects[j].project.Pinned
+	})
 }
 
 func getOriginalIndex(projects []projectWithIndex, cursor int) int {

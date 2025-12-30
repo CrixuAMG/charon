@@ -19,7 +19,7 @@ func NewOpen() *OpenCommand {
 func (c *OpenCommand) Name() string { return "open" }
 
 func (c *OpenCommand) Help() string {
-	return "open <project>   Open a project and exit"
+	return "open <project>  Open a project and exit"
 }
 
 func (c *OpenCommand) Run(ctx *app.Context, args []string) error {
