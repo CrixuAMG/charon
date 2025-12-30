@@ -14,12 +14,12 @@ type TaskSets struct {
 }
 
 type Project struct {
-	Name      string    `yaml:"name"`
-	Pinned    bool      `yaml:"pinned,omitempty"`
-	Path      string    `yaml:"path"`
-	Execution Execution `yaml:"execution"`
-	Tasks     []string  `yaml:"tasks,omitempty"`
-	TasksFrom string    `yaml:"tasks_from,omitempty"`
+	Name      string     `yaml:"name"`
+	Pinned    bool       `yaml:"pinned,omitempty"`
+	Path      string     `yaml:"path"`
+	Execution *Execution `yaml:"execution"`
+	Tasks     []string   `yaml:"tasks,omitempty"`
+	TasksFrom string     `yaml:"tasks_from,omitempty"`
 
 	Exists bool `yaml:"-"`
 }
@@ -29,12 +29,12 @@ type Scan struct {
 }
 
 type Execution struct {
-	Type      string `yaml:"type,omitempty"`
+	Type      string `yaml:"type"`
 	Container string `yaml:"container,omitempty"`
 }
 
 type Config struct {
-	Execution Execution           `yaml:"execution"`
+	Execution *Execution          `yaml:"execution"`
 	Theme     string              `yaml:"theme"`
 	Scan      Scan                `yaml:"scan"`
 	Projects  []Project           `yaml:"projects"`
