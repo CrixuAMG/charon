@@ -74,21 +74,53 @@ func (m Model) viewForm(title string) string {
 	b.WriteString(m.styles.ProjectName.Render(title))
 	b.WriteString("\n\n")
 
-	labels := []string{"Name:", "Path:", "Docker:", "Tasks:"}
-	descriptions := []string{
-		"Project identifier",
-		"Local filesystem path",
-		"Docker container path (empty for local)",
-		"Comma-separated commands",
+	// Field order: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6)
+	fields := []struct {
+		index       int
+		label       string
+		description string
+		value       string
+		isInput     bool
+	}{
+		{0, "Name:", "Project identifier", m.formInputs[0].View(), true},
+		{1, "Path:", "Local filesystem path", m.formInputs[1].View(), true},
+		{2, "Pinned:", "Pin to top of list (space to toggle)", m.renderBooleanField(m.formPinned), false},
+		{3, "Execution:", "Execution type (space/arrows to toggle)", m.renderExecutionField(), false},
+		{4, "Container:", "Docker container name (only for docker execution)", m.formInputs[2].View(), true},
+		{5, "TasksFrom:", "Select taskset (arrows to cycle)", m.renderTasksFromField(), false},
+		{6, "Tasks:", "Comma-separated commands", m.formInputs[3].View(), true},
 	}
 
-	for i, input := range m.formInputs {
-		label := m.styles.FormLabel.Render(labels[i])
-		b.WriteString(label + input.View())
-		if i == m.formFocus {
-			b.WriteString(" " + m.styles.Path.Render(descriptions[i]))
+	for _, field := range fields {
+		// Skip container field if execution type is local
+		if field.index == 4 && m.formExecType != "docker" {
+			continue
+		}
+
+		label := m.styles.FormLabel.Render(field.label)
+		b.WriteString(label)
+
+		// Highlight focused field
+		if field.index == m.formFocus {
+			b.WriteString(m.styles.SelectedProjectName.Render(field.value))
+		} else {
+			b.WriteString(field.value)
+		}
+
+		if field.index == m.formFocus {
+			b.WriteString(" " + m.styles.Path.Render(field.description))
 		}
 		b.WriteString("\n")
+
+		// Show taskset tasks when TasksFrom field is focused
+		if field.index == 5 && m.formFocus == 5 && m.formTasksFrom != "" {
+			if tasks, ok := m.config.TaskSets[m.formTasksFrom]; ok && len(tasks) > 0 {
+				taskList := strings.Join(tasks, ", ")
+				b.WriteString(m.styles.FormLabel.Render("  └─ Tasks: "))
+				b.WriteString(m.styles.Subtext.Render(taskList))
+				b.WriteString("\n")
+			}
+		}
 	}
 
 	formContent := m.styles.Form.Render(b.String())
@@ -106,6 +138,27 @@ func (m Model) viewForm(title string) string {
 	}
 
 	return footer.String()
+}
+
+func (m Model) renderBooleanField(value bool) string {
+	if value {
+		return "[✓] Yes"
+	}
+	return "[ ] No"
+}
+
+func (m Model) renderExecutionField() string {
+	if m.formExecType == "docker" {
+		return "◆ Docker"
+	}
+	return "○ Local"
+}
+
+func (m Model) renderTasksFromField() string {
+	if m.formTasksFrom == "" {
+		return "(none)"
+	}
+	return m.formTasksFrom
 }
 
 func (m Model) viewDelete() string {
@@ -208,6 +261,7 @@ func (m Model) renderHelpBar() string {
 				m.helpItem("a", "add"),
 				m.helpItem("e", "edit"),
 				m.helpItem("d", "delete"),
+				m.helpItem("t", "tasksets"),
 				m.helpItem("q", "quit"),
 			}
 		}
@@ -223,6 +277,26 @@ func (m Model) renderHelpBar() string {
 			m.helpItem("y", "confirm"),
 			m.helpItem("n", "cancel"),
 		}
+	case stateTasksetList:
+		items = []string{
+			m.helpItem("↑/↓", "navigate"),
+			m.helpItem("a", "add"),
+			m.helpItem("e", "edit"),
+			m.helpItem("d", "delete"),
+			m.helpItem("esc", "back"),
+		}
+	case stateTasksetAdd, stateTasksetEdit:
+		items = []string{
+			m.helpItem("tab", "next"),
+			m.helpItem("shift+tab", "prev"),
+			m.helpItem("ctrl+s", "save"),
+			m.helpItem("esc", "cancel"),
+		}
+	case stateTasksetDelete:
+		items = []string{
+			m.helpItem("y", "confirm"),
+			m.helpItem("n", "cancel"),
+		}
 	}
 
 	return m.styles.Help.Render(strings.Join(items, " "+m.styles.HelpSeparator.String()+" "))
@@ -230,4 +304,117 @@ func (m Model) renderHelpBar() string {
 
 func (m Model) helpItem(key, desc string) string {
 	return m.styles.HelpKey.Render(key) + " " + m.styles.HelpDesc.Render(desc)
+}
+
+// Taskset view functions
+
+func (m Model) viewTasksetList() string {
+	var b strings.Builder
+
+	b.WriteString(m.styles.ProjectName.Render("📦 Taskset Management"))
+	b.WriteString("\n\n")
+
+	tasksetNames := m.getTasksetNames()
+
+	if len(tasksetNames) == 0 {
+		b.WriteString("\n")
+		b.WriteString(m.styles.Path.Render("No tasksets configured. Press 'a' to add one."))
+		b.WriteString("\n\n")
+	} else {
+		for i, name := range tasksetNames {
+			isSelected := i == m.tasksetCursor
+			tasks := m.config.TaskSets[name]
+
+			var line strings.Builder
+			if isSelected {
+				line.WriteString(m.styles.SelectedProjectName.Render("▶ " + name))
+			} else {
+				line.WriteString(m.styles.ProjectName.Render("  " + name))
+			}
+
+			line.WriteString("\n")
+			taskList := strings.Join(tasks, ", ")
+			if isSelected {
+				line.WriteString(m.styles.SelectedProject.Render("  └─ " + taskList))
+			} else {
+				line.WriteString(m.styles.Project.Render("  └─ " + taskList))
+			}
+
+			b.WriteString(line.String())
+			b.WriteString("\n")
+		}
+	}
+
+	if m.message != "" {
+		b.WriteString("\n")
+		if m.isError {
+			b.WriteString(m.styles.Error.Render("✗ " + m.message))
+		} else {
+			b.WriteString(m.styles.Success.Render("✓ " + m.message))
+		}
+	}
+
+	return b.String()
+}
+
+func (m Model) viewTasksetForm(title string) string {
+	var b strings.Builder
+
+	b.WriteString(m.styles.ProjectName.Render(title))
+	b.WriteString("\n\n")
+
+	labels := []string{"Name:", "Tasks:"}
+	descriptions := []string{
+		"Taskset identifier",
+		"Comma-separated commands",
+	}
+
+	for i, input := range m.formInputs {
+		label := m.styles.FormLabel.Render(labels[i])
+		b.WriteString(label + input.View())
+		if i == m.formFocus {
+			b.WriteString(" " + m.styles.Path.Render(descriptions[i]))
+		}
+		b.WriteString("\n")
+	}
+
+	formContent := m.styles.Form.Render(b.String())
+
+	var footer strings.Builder
+	footer.WriteString(formContent)
+
+	if m.message != "" {
+		footer.WriteString("\n\n")
+		if m.isError {
+			footer.WriteString(m.styles.Error.Render("✗ " + m.message))
+		} else {
+			footer.WriteString(m.styles.Success.Render("✓ " + m.message))
+		}
+	}
+
+	return footer.String()
+}
+
+func (m Model) viewTasksetDelete() string {
+	var b strings.Builder
+
+	tasksetNames := m.getTasksetNames()
+	if m.tasksetCursor < len(tasksetNames) {
+		name := tasksetNames[m.tasksetCursor]
+		tasks := m.config.TaskSets[name]
+
+		var msg strings.Builder
+		msg.WriteString(m.styles.Error.Render("⚠ Delete Taskset"))
+		msg.WriteString("\n\n")
+		msg.WriteString("Are you sure you want to delete this taskset?\n\n")
+		msg.WriteString(m.styles.ProjectName.Render(name))
+		msg.WriteString("\n")
+		msg.WriteString(m.styles.Path.Render("Tasks: " + strings.Join(tasks, ", ")))
+		msg.WriteString("\n\n")
+		msg.WriteString(m.styles.Path.Render("Press 'y' to confirm or 'n' to cancel"))
+
+		b.WriteString(m.styles.DeleteBox.Render(msg.String()))
+	}
+
+	return b.String()
 }

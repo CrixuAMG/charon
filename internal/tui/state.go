@@ -7,6 +7,10 @@ const (
 	stateAdd
 	stateEdit
 	stateDelete
+	stateTasksetList
+	stateTasksetAdd
+	stateTasksetEdit
+	stateTasksetDelete
 )
 
 type sortMode int

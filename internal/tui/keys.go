@@ -21,6 +21,7 @@ type keyMap struct {
 	PrevField key.Binding
 	Confirm   key.Binding
 	Deny      key.Binding
+	Tasksets  key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -96,6 +97,10 @@ func defaultKeyMap() keyMap {
 		Deny: key.NewBinding(
 			key.WithKeys("n", "esc", "q"),
 			key.WithHelp("n", "cancel"),
+		),
+		Tasksets: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "tasksets"),
 		),
 	}
 }

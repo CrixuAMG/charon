@@ -62,12 +62,16 @@ func getTabTitle(task string) string {
 	task = strings.TrimSpace(task)
 
 	switch {
+	case task == "db":
+		return "database"
 	case strings.HasPrefix(task, "lazygit"):
 		return "git"
 	case strings.HasPrefix(task, "vim"), strings.HasPrefix(task, "nvim"):
 		return "editor"
 	case strings.Contains(task, "yarn dev"), strings.Contains(task, "npm run dev"):
 		return "dev"
+	case strings.Contains(task, "yarn install"), strings.Contains(task, "npm install"):
+		return "node"
 	case strings.Contains(task, "go "):
 		return "go"
 	case strings.Contains(task, "php"):
