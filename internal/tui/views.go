@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/execution"
 	"github.com/crixuamg/charon/internal/tasks"
 )
 
@@ -136,13 +137,15 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 		nameStyle = m.styles.SelectedProjectName
 	}
 
+	exec := execution.Resolve(m.config, project)
+
 	warningIcon := ""
 	icon := "○ "
 	pin := ""
 	if project.Exists == false {
 		warningIcon = "⚠ "
 	}
-	if project.DockerPath != "" || m.config.DockerPath != "" {
+	if exec.Type == "docker" {
 		icon = "◆ "
 	}
 	if project.Pinned {
@@ -154,10 +157,8 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 	content.WriteString(" ")
 
 	var pathInfo string
-	if project.DockerPath != "" {
+	if exec.Type == "docker" {
 		pathInfo = m.styles.DockerBadge.Render("docker") + " " + m.styles.Path.Render(project.DockerPath+"/"+project.Name)
-	} else if m.config.DockerPath != "" {
-		pathInfo = m.styles.DockerBadge.Render("docker") + " " + m.styles.Path.Render(m.config.DockerPath+"/"+project.Name)
 	} else {
 		pathInfo = m.styles.LocalBadge.Render("local") + " " + m.styles.Path.Render(project.Path)
 	}
