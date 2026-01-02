@@ -112,15 +112,25 @@ func TestSaveAndLoad(t *testing.T) {
 
 	// Create a config to save
 	cfg := &Config{
-		DockerPath: "/var/www/html",
-		Container:  "dev-container",
+		Execution: &Execution{
+			Type:      "docker",
+			Container: "dev-container",
+		},
 		Projects: []Project{
 			{
-				Name:       "test-project",
-				Path:       "/home/user/projects/test",
-				DockerPath: "/var/www/html",
-				Tasks:      []string{"vim", "lazygit"},
+				Name:   "test-project",
+				Path:   "/home/user/projects/test",
+				Pinned: true,
+				Execution: &Execution{
+					Type:      "docker",
+					Container: "project-container",
+				},
+				Tasks:     []string{"vim", "lazygit"},
+				TasksFrom: "common",
 			},
+		},
+		TaskSets: map[string][]string{
+			"common": {"lazygit", "nvim"},
 		},
 	}
 
@@ -137,12 +147,14 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 
 	// Verify the loaded config
-	if loaded.DockerPath != cfg.DockerPath {
-		t.Errorf("DockerPath = %q, want %q", loaded.DockerPath, cfg.DockerPath)
+	if loaded.Execution == nil {
+		t.Fatal("Expected Execution to be set")
 	}
-
-	if loaded.Container != cfg.Container {
-		t.Errorf("Container = %q, want %q", loaded.Container, cfg.Container)
+	if loaded.Execution.Type != "docker" {
+		t.Errorf("Execution.Type = %q, want %q", loaded.Execution.Type, "docker")
+	}
+	if loaded.Execution.Container != "dev-container" {
+		t.Errorf("Execution.Container = %q, want %q", loaded.Execution.Container, "dev-container")
 	}
 
 	if len(loaded.Projects) != 1 {
@@ -153,7 +165,22 @@ func TestSaveAndLoad(t *testing.T) {
 		t.Errorf("Project name = %q, want %q", loaded.Projects[0].Name, "test-project")
 	}
 
+	if !loaded.Projects[0].Pinned {
+		t.Error("Expected project to be pinned")
+	}
+
+	if loaded.Projects[0].TasksFrom != "common" {
+		t.Errorf("TasksFrom = %q, want %q", loaded.Projects[0].TasksFrom, "common")
+	}
+
 	if len(loaded.Projects[0].Tasks) != 2 {
 		t.Errorf("Expected 2 tasks, got %d", len(loaded.Projects[0].Tasks))
+	}
+
+	if loaded.Projects[0].Execution == nil {
+		t.Fatal("Expected project Execution to be set")
+	}
+	if loaded.Projects[0].Execution.Container != "project-container" {
+		t.Errorf("Project Execution.Container = %q, want %q", loaded.Projects[0].Execution.Container, "project-container")
 	}
 }

@@ -32,6 +32,14 @@ type Model struct {
 	currentFilter filterMode
 	styles        Styles
 	keys          keyMap
+	// Form-specific fields
+	formPinned       bool
+	formExecType     string // "local" or "docker"
+	formTasksFrom    string // selected taskset name or empty
+	formTasksetNames []string
+	// Taskset management fields
+	tasksetCursor   int
+	editTasksetName string // name of taskset being edited
 }
 
 func NewModel(cfg *config.Config) Model {
@@ -65,6 +73,7 @@ func getTheme(themeName string) Theme {
 }
 
 func (m *Model) initFormInputs(project *config.Project) {
+	// Form fields: Name, Path, Container (text input), Tasks, TasksFrom (text input for now)
 	m.formInputs = make([]textinput.Model, 4)
 
 	inputs := []struct {
@@ -74,15 +83,33 @@ func (m *Model) initFormInputs(project *config.Project) {
 	}{
 		{"project-name", 50, ""},
 		{"~/path/to/project", 200, ""},
-		{"/var/www/html (leave empty for local)", 200, ""},
+		{"container-name", 100, ""},
 		{"echo 'Hello World'; pwd;", 500, ""},
+	}
+
+	// Initialize form state
+	m.formPinned = false
+	m.formExecType = "local"
+	m.formTasksFrom = ""
+
+	// Build list of available taskset names
+	m.formTasksetNames = []string{""}
+	for name := range m.config.TaskSets {
+		m.formTasksetNames = append(m.formTasksetNames, name)
 	}
 
 	if project != nil {
 		inputs[0].value = project.Name
 		inputs[1].value = project.Path
-		inputs[2].value = project.DockerPath
 		inputs[3].value = strings.Join(project.Tasks, ", ")
+
+		m.formPinned = project.Pinned
+		m.formTasksFrom = project.TasksFrom
+
+		if project.Execution != nil {
+			m.formExecType = project.Execution.Type
+			inputs[2].value = project.Execution.Container
+		}
 	}
 
 	for i, cfg := range inputs {
@@ -130,6 +157,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateForm(msg)
 		case stateDelete:
 			return m.updateDelete(msg)
+		case stateTasksetList:
+			return m.updateTasksetList(msg)
+		case stateTasksetAdd, stateTasksetEdit:
+			return m.updateTasksetForm(msg)
+		case stateTasksetDelete:
+			return m.updateTasksetDelete(msg)
 		}
 	}
 
@@ -212,6 +245,11 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = ""
 		}
 
+	case key.Matches(msg, m.keys.Tasksets):
+		m.state = stateTasksetList
+		m.tasksetCursor = 0
+		m.message = ""
+
 	case key.Matches(msg, m.keys.First):
 		m.cursor = 0
 		m.message = ""
@@ -255,40 +293,144 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// getInputIndex maps logical form field index to formInputs array index
+// Returns -1 if the field is not a text input
+func (m Model) getInputIndex(fieldIndex int) int {
+	// Field mapping: Name(0)→0, Path(1)→1, Pinned(2)→-1, ExecType(3)→-1, Container(4)→2, TasksFrom(5)→-1, Tasks(6)→3
+	switch fieldIndex {
+	case 0:
+		return 0 // Name
+	case 1:
+		return 1 // Path
+	case 4:
+		return 2 // Container
+	case 6:
+		return 3 // Tasks
+	default:
+		return -1 // Not a text input
+	}
+}
+
 func (m Model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Total fields: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6)
+	totalFields := 7
+
 	switch {
 	case key.Matches(msg, m.keys.Cancel):
 		m.state = stateList
 		return m, nil
 
 	case key.Matches(msg, m.keys.NextField):
-		m.formInputs[m.formFocus].Blur()
-		m.formFocus = (m.formFocus + 1) % len(m.formInputs)
-		m.formInputs[m.formFocus].Focus()
+		// Blur current field if it's a text input
+		if inputIdx := m.getInputIndex(m.formFocus); inputIdx >= 0 {
+			m.formInputs[inputIdx].Blur()
+		}
+		m.formFocus = (m.formFocus + 1) % totalFields
+		// Skip container field if execution type is local
+		if m.formFocus == 4 && m.formExecType != "docker" {
+			m.formFocus = (m.formFocus + 1) % totalFields
+		}
+		// Focus new field if it's a text input
+		if inputIdx := m.getInputIndex(m.formFocus); inputIdx >= 0 {
+			m.formInputs[inputIdx].Focus()
+		}
 		return m, textinput.Blink
 
 	case key.Matches(msg, m.keys.PrevField):
-		m.formInputs[m.formFocus].Blur()
+		// Blur current field if it's a text input
+		if inputIdx := m.getInputIndex(m.formFocus); inputIdx >= 0 {
+			m.formInputs[inputIdx].Blur()
+		}
 		m.formFocus--
 		if m.formFocus < 0 {
-			m.formFocus = len(m.formInputs) - 1
+			m.formFocus = totalFields - 1
 		}
-		m.formInputs[m.formFocus].Focus()
+		// Skip container field if execution type is local
+		if m.formFocus == 4 && m.formExecType != "docker" {
+			m.formFocus--
+			if m.formFocus < 0 {
+				m.formFocus = totalFields - 1
+			}
+		}
+		// Focus new field if it's a text input
+		if inputIdx := m.getInputIndex(m.formFocus); inputIdx >= 0 {
+			m.formInputs[inputIdx].Focus()
+		}
 		return m, textinput.Blink
 
 	case key.Matches(msg, m.keys.Save):
 		return m.saveProject()
 	}
 
-	var cmd tea.Cmd
-	m.formInputs[m.formFocus], cmd = m.formInputs[m.formFocus].Update(msg)
-	return m, cmd
+	// Handle field-specific input
+	switch m.formFocus {
+	case 2: // Pinned (boolean toggle)
+		if msg.Type == tea.KeySpace || msg.Type == tea.KeyEnter {
+			m.formPinned = !m.formPinned
+		}
+	case 3: // Execution Type (selection)
+		if msg.Type == tea.KeyLeft || msg.Type == tea.KeyRight || msg.Type == tea.KeySpace {
+			if m.formExecType == "local" {
+				m.formExecType = "docker"
+			} else {
+				m.formExecType = "local"
+			}
+		}
+	case 5: // TasksFrom (selection)
+		if len(m.formTasksetNames) == 0 {
+			break
+		}
+		if msg.Type == tea.KeyLeft {
+			// Cycle backwards through taskset names
+			currentIdx := -1
+			for i, name := range m.formTasksetNames {
+				if name == m.formTasksFrom {
+					currentIdx = i
+					break
+				}
+			}
+			if currentIdx == -1 {
+				// Current value not in list, start from beginning
+				m.formTasksFrom = m.formTasksetNames[0]
+			} else if currentIdx > 0 {
+				m.formTasksFrom = m.formTasksetNames[currentIdx-1]
+			} else {
+				m.formTasksFrom = m.formTasksetNames[len(m.formTasksetNames)-1]
+			}
+		} else if msg.Type == tea.KeyRight || msg.Type == tea.KeySpace {
+			// Cycle forwards through taskset names
+			currentIdx := -1
+			for i, name := range m.formTasksetNames {
+				if name == m.formTasksFrom {
+					currentIdx = i
+					break
+				}
+			}
+			if currentIdx == -1 {
+				// Current value not in list, start from beginning
+				m.formTasksFrom = m.formTasksetNames[0]
+			} else if currentIdx < len(m.formTasksetNames)-1 {
+				m.formTasksFrom = m.formTasksetNames[currentIdx+1]
+			} else {
+				m.formTasksFrom = m.formTasksetNames[0]
+			}
+		}
+	default:
+		// For text input fields
+		if inputIdx := m.getInputIndex(m.formFocus); inputIdx >= 0 {
+			var cmd tea.Cmd
+			m.formInputs[inputIdx], cmd = m.formInputs[inputIdx].Update(msg)
+			return m, cmd
+		}
+	}
+
+	return m, nil
 }
 
 func (m Model) saveProject() (tea.Model, tea.Cmd) {
 	name := strings.TrimSpace(m.formInputs[0].Value())
 	path := strings.TrimSpace(m.formInputs[1].Value())
-	dockerPath := strings.TrimSpace(m.formInputs[2].Value())
+	container := strings.TrimSpace(m.formInputs[2].Value())
 	tasksStr := strings.TrimSpace(m.formInputs[3].Value())
 
 	if name == "" {
@@ -307,10 +449,19 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 	}
 
 	project := config.Project{
-		Name:       name,
-		Path:       path,
-		DockerPath: dockerPath,
-		Tasks:      tasks,
+		Name:      name,
+		Path:      path,
+		Pinned:    m.formPinned,
+		Tasks:     tasks,
+		TasksFrom: m.formTasksFrom,
+	}
+
+	// Set execution if not local or if container is specified
+	if m.formExecType == "docker" || container != "" {
+		project.Execution = &config.Execution{
+			Type:      m.formExecType,
+			Container: container,
+		}
 	}
 
 	if m.state == stateAdd {
@@ -386,6 +537,14 @@ func (m Model) View() string {
 		mainContent = m.viewForm("Edit Project")
 	case stateDelete:
 		mainContent = m.viewDelete()
+	case stateTasksetList:
+		mainContent = m.viewTasksetList()
+	case stateTasksetAdd:
+		mainContent = m.viewTasksetForm("Add New Taskset")
+	case stateTasksetEdit:
+		mainContent = m.viewTasksetForm("Edit Taskset")
+	case stateTasksetDelete:
+		mainContent = m.viewTasksetDelete()
 	}
 
 	content.WriteString(mainContent)
@@ -408,4 +567,198 @@ func (m Model) View() string {
 	content.WriteString(helpBar)
 
 	return m.styles.Container.Render(content.String())
+}
+
+// Taskset management functions
+
+func (m *Model) initTasksetFormInputs(tasksetName string) {
+	// Taskset form has 2 fields: Name and Tasks
+	m.formInputs = make([]textinput.Model, 2)
+
+	inputs := []struct {
+		placeholder string
+		charLimit   int
+		value       string
+	}{
+		{"taskset-name", 50, ""},
+		{"lazygit, nvim, yarn dev", 500, ""},
+	}
+
+	if tasksetName != "" {
+		inputs[0].value = tasksetName
+		if tasks, ok := m.config.TaskSets[tasksetName]; ok {
+			inputs[1].value = strings.Join(tasks, ", ")
+		}
+		m.editTasksetName = tasksetName
+	} else {
+		m.editTasksetName = ""
+	}
+
+	for i, cfg := range inputs {
+		m.formInputs[i] = textinput.New()
+		m.formInputs[i].Placeholder = cfg.placeholder
+		m.formInputs[i].CharLimit = cfg.charLimit
+		m.formInputs[i].Width = 40
+		if cfg.value != "" {
+			m.formInputs[i].SetValue(cfg.value)
+		}
+	}
+
+	m.formFocus = 0
+	m.formInputs[0].Focus()
+}
+
+func (m Model) getTasksetNames() []string {
+	names := make([]string, 0, len(m.config.TaskSets))
+	for name := range m.config.TaskSets {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (m Model) updateTasksetList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	tasksetNames := m.getTasksetNames()
+
+	switch {
+	case key.Matches(msg, m.keys.Cancel), key.Matches(msg, m.keys.Quit):
+		m.state = stateList
+		m.message = ""
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.tasksetCursor > 0 {
+			m.tasksetCursor--
+		}
+		m.message = ""
+
+	case key.Matches(msg, m.keys.Down):
+		if m.tasksetCursor < len(tasksetNames)-1 {
+			m.tasksetCursor++
+		}
+		m.message = ""
+
+	case key.Matches(msg, m.keys.Add):
+		m.state = stateTasksetAdd
+		m.initTasksetFormInputs("")
+		m.message = ""
+		return m, textinput.Blink
+
+	case key.Matches(msg, m.keys.Edit):
+		if len(tasksetNames) > 0 && m.tasksetCursor < len(tasksetNames) {
+			m.state = stateTasksetEdit
+			m.initTasksetFormInputs(tasksetNames[m.tasksetCursor])
+			m.message = ""
+			return m, textinput.Blink
+		}
+
+	case key.Matches(msg, m.keys.Delete):
+		if len(tasksetNames) > 0 && m.tasksetCursor < len(tasksetNames) {
+			m.state = stateTasksetDelete
+			m.message = ""
+		}
+	}
+
+	return m, nil
+}
+
+func (m Model) updateTasksetForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Cancel):
+		m.state = stateTasksetList
+		return m, nil
+
+	case key.Matches(msg, m.keys.NextField):
+		m.formInputs[m.formFocus].Blur()
+		m.formFocus = (m.formFocus + 1) % len(m.formInputs)
+		m.formInputs[m.formFocus].Focus()
+		return m, textinput.Blink
+
+	case key.Matches(msg, m.keys.PrevField):
+		m.formInputs[m.formFocus].Blur()
+		m.formFocus--
+		if m.formFocus < 0 {
+			m.formFocus = len(m.formInputs) - 1
+		}
+		m.formInputs[m.formFocus].Focus()
+		return m, textinput.Blink
+
+	case key.Matches(msg, m.keys.Save):
+		return m.saveTaskset()
+	}
+
+	var cmd tea.Cmd
+	m.formInputs[m.formFocus], cmd = m.formInputs[m.formFocus].Update(msg)
+	return m, cmd
+}
+
+func (m Model) saveTaskset() (tea.Model, tea.Cmd) {
+	name := strings.TrimSpace(m.formInputs[0].Value())
+	tasksStr := strings.TrimSpace(m.formInputs[1].Value())
+
+	if name == "" {
+		m.message = "Name is required"
+		m.isError = true
+		return m, nil
+	}
+
+	var tasks []string
+	if tasksStr != "" {
+		for _, t := range strings.Split(tasksStr, ",") {
+			if t = strings.TrimSpace(t); t != "" {
+				tasks = append(tasks, t)
+			}
+		}
+	}
+
+	if m.config.TaskSets == nil {
+		m.config.TaskSets = make(map[string][]string)
+	}
+
+	// If editing and name changed, delete old entry
+	if m.state == stateTasksetEdit && m.editTasksetName != "" && m.editTasksetName != name {
+		delete(m.config.TaskSets, m.editTasksetName)
+	}
+
+	m.config.TaskSets[name] = tasks
+
+	if err := config.Save(m.config); err != nil {
+		m.message = "Error saving: " + err.Error()
+		m.isError = true
+		return m, nil
+	}
+
+	m.message = "Taskset saved!"
+	m.isError = false
+	m.state = stateTasksetList
+	return m, nil
+}
+
+func (m Model) updateTasksetDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	tasksetNames := m.getTasksetNames()
+
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("y", "enter"))):
+		if m.tasksetCursor < len(tasksetNames) {
+			name := tasksetNames[m.tasksetCursor]
+			delete(m.config.TaskSets, name)
+
+			if m.tasksetCursor >= len(m.config.TaskSets) && m.tasksetCursor > 0 {
+				m.tasksetCursor--
+			}
+
+			if err := config.Save(m.config); err != nil {
+				m.message = "Error saving: " + err.Error()
+				m.isError = true
+			} else {
+				m.message = "Taskset deleted"
+				m.isError = false
+			}
+		}
+		m.state = stateTasksetList
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("n", "esc", "q"))):
+		m.state = stateTasksetList
+	}
+
+	return m, nil
 }
