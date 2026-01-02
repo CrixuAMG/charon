@@ -158,7 +158,8 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 
 	var pathInfo string
 	if exec.Type == "docker" {
-		pathInfo = m.styles.DockerBadge.Render("docker") + " " + m.styles.Path.Render(project.DockerPath+"/"+project.Name)
+		// TODO add docker path
+		pathInfo = m.styles.DockerBadge.Render("docker") + " " + m.styles.Path.Render(project.Path+"/"+project.Name)
 	} else {
 		pathInfo = m.styles.LocalBadge.Render("local") + " " + m.styles.Path.Render(project.Path)
 	}

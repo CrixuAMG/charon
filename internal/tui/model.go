@@ -81,8 +81,7 @@ func (m *Model) initFormInputs(project *config.Project) {
 	if project != nil {
 		inputs[0].value = project.Name
 		inputs[1].value = project.Path
-		inputs[2].value = project.DockerPath
-		inputs[3].value = strings.Join(project.Tasks, ", ")
+		inputs[2].value = strings.Join(project.Tasks, ", ")
 	}
 
 	for i, cfg := range inputs {
@@ -288,7 +287,6 @@ func (m Model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) saveProject() (tea.Model, tea.Cmd) {
 	name := strings.TrimSpace(m.formInputs[0].Value())
 	path := strings.TrimSpace(m.formInputs[1].Value())
-	dockerPath := strings.TrimSpace(m.formInputs[2].Value())
 	tasksStr := strings.TrimSpace(m.formInputs[3].Value())
 
 	if name == "" {
@@ -307,10 +305,9 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 	}
 
 	project := config.Project{
-		Name:       name,
-		Path:       path,
-		DockerPath: dockerPath,
-		Tasks:      tasks,
+		Name:  name,
+		Path:  path,
+		Tasks: tasks,
 	}
 
 	if m.state == stateAdd {

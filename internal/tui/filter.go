@@ -6,6 +6,7 @@ import (
 
 	"github.com/crixuamg/charon/internal/config"
 	"github.com/crixuamg/charon/internal/db"
+	"github.com/crixuamg/charon/internal/execution"
 	"github.com/sahilm/fuzzy"
 )
 
@@ -32,11 +33,13 @@ func filterProjects(projects []config.Project, cfg *config.Config, filter filter
 }
 
 func matchesFilter(p config.Project, cfg *config.Config, filter filterMode) bool {
+	exec := execution.Resolve(cfg, p)
+
 	switch filter {
 	case filterDocker:
-		return p.DockerPath != "" || cfg.DockerPath != ""
+		return exec.Type == "docker"
 	case filterLocal:
-		return p.DockerPath == "" && cfg.DockerPath == ""
+		return exec.Type == "local"
 	default:
 		return true
 	}
