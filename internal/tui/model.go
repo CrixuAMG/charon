@@ -38,8 +38,8 @@ type Model struct {
 	formTasksFrom    string // selected taskset name or empty
 	formTasksetNames []string
 	// Taskset management fields
-	tasksetCursor    int
-	editTasksetName  string // name of taskset being edited
+	tasksetCursor   int
+	editTasksetName string // name of taskset being edited
 }
 
 func NewModel(cfg *config.Config) Model {
