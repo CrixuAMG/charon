@@ -14,6 +14,7 @@ A TUI project opener for Kitty terminal with Docker support. Named after the fer
 - **Fuzzy Search** - Quickly find projects by typing `/` and searching
 - **Filtering** - Filter projects by Docker or Local
 - **Sorting** - Sort projects by name, recently used, or custom order
+- **Layout Modes** - Switch between card and table layouts (compact and full)
 - **Usage Tracking** - Automatically tracks project access in SQLite database
 - **Recent Projects** - Sort by recently accessed projects
 - **Themes** - Choose from multiple color themes (Catppuccin Mocha, Gruvbox, Tokyo Night)
@@ -96,6 +97,10 @@ docker_path: /var/www/html    # Default Docker path for projects
 container: my-container       # Docker container name
 theme: catppuccin             # Theme: catppuccin (default), gruvbox, tokyonight
 
+# Interface settings
+interface:
+  layout: table-compact       # Layout: card, card-compact, table, table-compact
+
 # Projects
 projects:
   - name: my-app
@@ -122,6 +127,7 @@ projects:
 | `docker_path` | Global default path inside Docker container |
 | `container` | Docker container name for `docker exec` |
 | `theme` | Color theme: `catppuccin` (default), `gruvbox`, `tokyonight` |
+| `interface.layout` | Display layout: `card`, `card-compact`, `table`, `table-compact` |
 | `projects` | Array of project configurations |
 
 ### Project Fields
@@ -153,6 +159,7 @@ charon
 | `/` | Search projects (fuzzy search) |
 | `s` | Cycle sort mode (Name → Recent → Custom) |
 | `f` | Cycle filter (All → Docker → Local) |
+| `l` | Cycle layout (Card → Card Compact → Table → Table Compact) |
 | `a` | Add new project |
 | `e` | Edit selected project |
 | `d` / `x` | Delete selected project |
@@ -182,6 +189,32 @@ charon
 |-----|--------|
 | `y` / `Enter` | Confirm delete |
 | `n` / `Esc` | Cancel |
+
+### Layout Modes
+
+Charon supports four different layout modes for displaying projects:
+
+#### Card Layout (Default)
+- Full project cards with all details
+- Shows: name, type badge, path, and all tasks
+- Best for: Detailed overview with fewer projects
+
+#### Card Compact Layout
+- Simplified cards without task lists
+- Shows: name, type badge, and path only
+- Best for: Quick scanning with many projects
+
+#### Table Layout
+- Tabular view with aligned columns
+- Shows: name, type, path, and tasks in columns
+- Best for: Comparing projects side-by-side
+
+#### Table Compact Layout
+- Minimal table without tasks column
+- Shows: name, type, and path in columns
+- Best for: Maximum density, viewing many projects at once
+
+Press `l` to cycle through layouts. Your preference is automatically saved to the config file.
 
 ## How It Works
 

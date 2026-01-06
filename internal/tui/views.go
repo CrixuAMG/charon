@@ -24,6 +24,7 @@ func (m Model) viewList() string {
 	if m.currentSort != sortByCustom {
 		statusParts = append(statusParts, m.styles.FilterBadge.Render("Sort: "+m.currentSort.String()))
 	}
+	statusParts = append(statusParts, m.styles.FilterBadge.Render("Layout: "+m.currentLayout.String()))
 
 	count := m.styles.Count.Render(fmt.Sprintf("%d", len(filtered)))
 	if len(m.config.Projects) != len(filtered) {
@@ -45,11 +46,16 @@ func (m Model) viewList() string {
 		b.WriteString(m.styles.Path.Render(emptyMsg))
 		b.WriteString("\n\n")
 	} else {
-		for i, pw := range filtered {
-			isSelected := i == m.cursor
-			b.WriteString(m.renderProject(pw.project, isSelected))
-			if i < len(filtered)-1 {
-				b.WriteString("\n")
+		switch m.currentLayout {
+		case layoutTable, layoutTableCompact:
+			b.WriteString(m.renderProjectsTable(filtered))
+		default:
+			for i, pw := range filtered {
+				isSelected := i == m.cursor
+				b.WriteString(m.renderProjectCard(pw.project, isSelected))
+				if i < len(filtered)-1 {
+					b.WriteString("\n")
+				}
 			}
 		}
 		b.WriteString("\n")
@@ -182,7 +188,7 @@ func (m Model) viewDelete() string {
 	return b.String()
 }
 
-func (m Model) renderProject(project config.Project, selected bool) string {
+func (m Model) renderProjectCard(project config.Project, selected bool) string {
 	var content strings.Builder
 
 	nameStyle := m.styles.ProjectName
@@ -211,16 +217,17 @@ func (m Model) renderProject(project config.Project, selected bool) string {
 
 	var pathInfo string
 	if exec.Type == "docker" {
-		// TODO add docker path
 		pathInfo = m.styles.DockerBadge.Render("docker") + " " + m.styles.Path.Render(project.Path+"/"+project.Name)
 	} else {
 		pathInfo = m.styles.LocalBadge.Render("local") + " " + m.styles.Path.Render(project.Path)
 	}
 	content.WriteString(pathInfo)
 
+	// Show tasks based on layout mode
+	isCompact := m.currentLayout == layoutCardCompact
 	tasks := tasks.EffectiveTasks(project, m.config)
 
-	if len(tasks) > 0 {
+	if len(tasks) > 0 && !isCompact {
 		content.WriteString("\n  ")
 		tasksList := make([]string, len(tasks))
 		for i, t := range tasks {
@@ -258,6 +265,7 @@ func (m Model) renderHelpBar() string {
 				m.helpItem("/", "search"),
 				m.helpItem("s", "sort"),
 				m.helpItem("f", "filter"),
+				m.helpItem("l", "layout"),
 				m.helpItem("a", "add"),
 				m.helpItem("e", "edit"),
 				m.helpItem("d", "delete"),
@@ -417,4 +425,123 @@ func (m Model) viewTasksetDelete() string {
 	}
 
 	return b.String()
+}
+
+func (m Model) renderProjectsTable(filtered []projectWithIndex) string {
+	var b strings.Builder
+
+	isCompact := m.currentLayout == layoutTableCompact
+
+	// Table header
+	headerStyle := m.styles.ProjectName.Bold(true)
+	if isCompact {
+		b.WriteString(headerStyle.Render("NAME"))
+		b.WriteString("  ")
+		b.WriteString(headerStyle.Render("TYPE"))
+		b.WriteString("  ")
+		b.WriteString(headerStyle.Render("PATH"))
+		b.WriteString("\n")
+		// Add separator line if width is available
+		if m.width > 4 {
+			b.WriteString(m.styles.Subtext.Render(strings.Repeat("─", m.width-4)))
+			b.WriteString("\n")
+		}
+	} else {
+		b.WriteString(headerStyle.Render("NAME"))
+		b.WriteString("  ")
+		b.WriteString(headerStyle.Render("TYPE"))
+		b.WriteString("  ")
+		b.WriteString(headerStyle.Render("PATH"))
+		b.WriteString("  ")
+		b.WriteString(headerStyle.Render("TASKS"))
+		b.WriteString("\n")
+		// Add separator line if width is available
+		if m.width > 4 {
+			b.WriteString(m.styles.Subtext.Render(strings.Repeat("─", m.width-4)))
+			b.WriteString("\n")
+		}
+	}
+
+	// Table rows
+	for i, pw := range filtered {
+		isSelected := i == m.cursor
+		b.WriteString(m.renderProjectTableRow(pw.project, isSelected, isCompact))
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+func (m Model) renderProjectTableRow(project config.Project, selected bool, compact bool) string {
+	var row strings.Builder
+
+	exec := execution.Resolve(m.config, project)
+
+	// Icons and name
+	warningIcon := ""
+	icon := "○"
+	pin := ""
+	if project.Exists == false {
+		warningIcon = "⚠"
+	}
+	if exec.Type == "docker" {
+		icon = "◆"
+	}
+	if project.Pinned {
+		pin = "📌"
+	}
+
+	nameStyle := m.styles.ProjectName
+	if selected {
+		nameStyle = m.styles.SelectedProjectName
+	}
+
+	// Name column (max 20 chars)
+	nameText := icon + " " + warningIcon + pin + project.Name
+	if len(nameText) > 20 {
+		nameText = nameText[:17] + "..."
+	}
+	row.WriteString(nameStyle.Render(fmt.Sprintf("%-20s", nameText)))
+	row.WriteString("  ")
+
+	// Type column
+	var typeText string
+	if exec.Type == "docker" {
+		typeText = m.styles.DockerBadge.Render("docker")
+	} else {
+		typeText = m.styles.LocalBadge.Render("local ")
+	}
+	row.WriteString(typeText)
+	row.WriteString("  ")
+
+	// Path column (max 40 chars)
+	pathText := project.Path
+	if exec.Type == "docker" {
+		pathText = project.Path + "/" + project.Name
+	}
+	if len(pathText) > 40 {
+		pathText = "..." + pathText[len(pathText)-37:]
+	}
+	row.WriteString(m.styles.Path.Render(fmt.Sprintf("%-40s", pathText)))
+
+	// Tasks column (only in non-compact mode)
+	if !compact {
+		row.WriteString("  ")
+		taskList := tasks.EffectiveTasks(project, m.config)
+		if len(taskList) > 0 {
+			tasksText := strings.Join(taskList, ", ")
+			if len(tasksText) > 50 {
+				tasksText = tasksText[:47] + "..."
+			}
+			row.WriteString(m.styles.Task.Render(tasksText))
+		}
+	}
+
+	// Apply selection style
+	result := row.String()
+	if selected {
+		result = m.styles.SelectedProject.Render(result)
+	}
+
+	return result
 }

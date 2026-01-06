@@ -13,6 +13,30 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type layoutMode int
+
+const (
+	layoutCard layoutMode = iota
+	layoutCardCompact
+	layoutTable
+	layoutTableCompact
+)
+
+func (l layoutMode) String() string {
+	switch l {
+	case layoutCard:
+		return "card"
+	case layoutCardCompact:
+		return "card-compact"
+	case layoutTable:
+		return "table"
+	case layoutTableCompact:
+		return "table-compact"
+	default:
+		return "card"
+	}
+}
+
 type Model struct {
 	config        *config.Config
 	db            *db.DB
@@ -30,6 +54,7 @@ type Model struct {
 	searchMode    bool
 	currentSort   sortMode
 	currentFilter filterMode
+	currentLayout layoutMode
 	styles        Styles
 	keys          keyMap
 	// Form-specific fields
@@ -49,6 +74,8 @@ func NewModel(cfg *config.Config) Model {
 		database = nil
 	}
 
+	layout := getLayout(cfg.Interface.Layout)
+
 	return Model{
 		config:        cfg,
 		db:            database,
@@ -56,8 +83,24 @@ func NewModel(cfg *config.Config) Model {
 		state:         stateList,
 		currentSort:   sortByCustom,
 		currentFilter: filterNone,
+		currentLayout: layout,
 		styles:        NewStyles(theme),
 		keys:          defaultKeyMap(),
+	}
+}
+
+func getLayout(layoutName string) layoutMode {
+	switch strings.ToLower(layoutName) {
+	case "card":
+		return layoutCard
+	case "card-compact":
+		return layoutCardCompact
+	case "table":
+		return layoutTable
+	case "table-compact":
+		return layoutTableCompact
+	default:
+		return layoutCard
 	}
 }
 
@@ -223,6 +266,16 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.currentFilter = (m.currentFilter + 1) % 3
 		m.cursor = 0
 		m.message = ""
+
+	case key.Matches(msg, m.keys.Layout):
+		m.currentLayout = (m.currentLayout + 1) % 4
+		m.message = ""
+		// Save layout preference to config
+		m.config.Interface.Layout = m.currentLayout.String()
+		if err := config.Save(m.config); err != nil {
+			m.message = "Failed to save layout preference"
+			m.isError = true
+		}
 
 	case key.Matches(msg, m.keys.Add):
 		m.state = stateAdd

@@ -33,9 +33,14 @@ type Execution struct {
 	Container string `yaml:"container,omitempty"`
 }
 
+type Interface struct {
+	Layout string `yaml:"layout,omitempty"` // card, card-compact, table, table-compact
+}
+
 type Config struct {
 	Execution *Execution          `yaml:"execution"`
 	Theme     string              `yaml:"theme"`
+	Interface Interface           `yaml:"interface,omitempty"`
 	Scan      Scan                `yaml:"scan"`
 	Projects  []Project           `yaml:"projects"`
 	TaskSets  map[string][]string `yaml:"task_sets,omitempty"`
