@@ -9,6 +9,7 @@ type keyMap struct {
 	Search    key.Binding
 	Sort      key.Binding
 	Filter    key.Binding
+	Layout    key.Binding
 	Add       key.Binding
 	Edit      key.Binding
 	Delete    key.Binding
@@ -49,6 +50,10 @@ func defaultKeyMap() keyMap {
 		Filter: key.NewBinding(
 			key.WithKeys("f"),
 			key.WithHelp("f", "filter"),
+		),
+		Layout: key.NewBinding(
+			key.WithKeys("l"),
+			key.WithHelp("l", "layout"),
 		),
 		Add: key.NewBinding(
 			key.WithKeys("a"),

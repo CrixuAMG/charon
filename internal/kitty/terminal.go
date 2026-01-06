@@ -2,7 +2,6 @@ package kitty
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -96,10 +95,5 @@ func (Terminal) SendText(
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("DEBUG: Error sending text: %v", err)
-	}
-
-	return err
+	return cmd.Run()
 }
