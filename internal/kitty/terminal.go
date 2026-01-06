@@ -2,10 +2,12 @@ package kitty
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -47,27 +49,32 @@ func (Terminal) LaunchDockerTab(
 	workdir string,
 ) (int, error) {
 
-	cmd := exec.Command(
-		"kitty", "@", "--to", socket,
+	args := []string{
+		"@", "--to", socket,
 		"launch", "--type=tab",
 		"--tab-title", title,
 		"docker", "exec", "-it",
 		"-w", workdir,
 		container,
-		"sh", "-c", "exec $SHELL",
-	)
+		"/bin/bash", "--login",
+	}
 
-	output, err := cmd.Output()
+	cmd := exec.Command("kitty", args...)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("launch docker tab: %w", err)
+		return 0, fmt.Errorf("launch docker tab: %w (output: %s)", err, string(output))
 	}
 
 	id, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("parse window id from output %q: %w", string(output), err)
 	}
 
-	// longer wait for docker init
 	time.Sleep(1 * time.Second)
 
 	return id, nil
@@ -78,7 +85,6 @@ func (Terminal) SendText(
 	windowID int,
 	text string,
 ) error {
-
 	cmd := exec.Command(
 		"kitty", "@", "--to", socket,
 		"send-text",
@@ -90,5 +96,10 @@ func (Terminal) SendText(
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("DEBUG: Error sending text: %v", err)
+	}
+
+	return err
 }
