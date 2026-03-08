@@ -57,6 +57,8 @@ func (m Model) viewList() string {
 		b.WriteString("\n")
 		b.WriteString(m.styles.Path.Render(emptyMsg))
 		b.WriteString("\n\n")
+	} else if m.currentLayout == layoutGrouped {
+		b.WriteString(m.viewGroupedList(filtered))
 	} else {
 		viewSize := m.viewportSize()
 		offset := m.scrollOffset
@@ -330,6 +332,159 @@ func (m Model) renderProjectCard(project config.Project, selected bool, multiSel
 	}
 
 	return style.Render(content.String())
+}
+
+// ── Grouped layout ────────────────────────────────────────────────────────────
+
+func (m Model) viewGroupedList(filtered []projectWithIndex) string {
+	var b strings.Builder
+
+	if len(filtered) == 0 {
+		return ""
+	}
+
+	rows := buildGroupedRows(filtered)
+	viewSize := m.viewportSize()
+	offset := m.scrollOffset
+	if offset < 0 {
+		offset = 0
+	}
+	end := offset + viewSize
+	if end > len(rows) {
+		end = len(rows)
+	}
+	visible := rows[offset:end]
+
+	cursorOriginalIdx := 0
+	if m.cursor < len(filtered) {
+		cursorOriginalIdx = filtered[m.cursor].index
+	}
+
+	if offset > 0 {
+		b.WriteString(m.styles.Subtext.Render(fmt.Sprintf("  ↑ %d more", offset)))
+		b.WriteString("\n")
+	}
+
+	for _, row := range visible {
+		switch {
+		case row.isHeader:
+			b.WriteString(m.styles.ProjectName.Bold(true).Render(fmt.Sprintf("● %s", row.tag)))
+			b.WriteString("  ")
+			b.WriteString(m.styles.Subtext.Render(fmt.Sprintf("(%d)", row.count)))
+		case row.tag == "" && !row.isHeader:
+			// blank spacer between groups
+			b.WriteString("")
+		default:
+			isCursor := row.pw.index == cursorOriginalIdx
+			isMultiSelected := m.selected[row.pw.index]
+			b.WriteString(m.renderGroupedProject(row.pw, isCursor, isMultiSelected))
+		}
+		b.WriteString("\n")
+	}
+
+	remaining := len(rows) - end
+	if remaining > 0 {
+		b.WriteString(m.styles.Subtext.Render(fmt.Sprintf("  ↓ %d more", remaining)))
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+func (m Model) renderGroupedProject(pw projectWithIndex, isCursor bool, isMultiSelected bool) string {
+	project := pw.project
+	exec := execution.Resolve(m.config, project)
+
+	nameStyle := m.styles.ProjectName
+	if isCursor {
+		nameStyle = m.styles.SelectedProjectName
+	}
+
+	// Checkbox.
+	checkbox := ""
+	if len(m.selected) > 0 {
+		if isMultiSelected {
+			checkbox = "[x] "
+		} else {
+			checkbox = "[ ] "
+		}
+	}
+
+	// Icon.
+	icon := "○"
+	if exec.Type == "docker" {
+		icon = "◆"
+	} else if exec.Type == "ssh" {
+		icon = "⇄"
+	}
+
+	// Badges.
+	warn := ""
+	if !project.Exists {
+		warn = "⚠ "
+	}
+	pin := ""
+	if project.Pinned {
+		pin = "📌"
+	}
+	arch := ""
+	if project.Archived {
+		arch = "🗄"
+	}
+
+	// Name (fixed width).
+	nameText := fmt.Sprintf("%s%s%s%s", warn, pin, arch, project.Name)
+	if len(nameText) > 22 {
+		nameText = nameText[:19] + "..."
+	}
+
+	// Execution badge.
+	var execBadge string
+	switch exec.Type {
+	case "docker":
+		execBadge = m.styles.DockerBadge.Render("docker")
+	case "ssh":
+		execBadge = m.styles.LocalBadge.Render("ssh")
+	default:
+		execBadge = m.styles.LocalBadge.Render("local")
+	}
+
+	// Location: remote host for SSH, path for others.
+	location := project.Path
+	if project.SSH != nil {
+		location = project.SSH.Host + ":" + project.SSH.Path
+	}
+	if len(location) > 30 {
+		location = "..." + location[len(location)-27:]
+	}
+
+	// Git info (compact).
+	gitStr := ""
+	if gi, ok := m.gitInfos[project.Name]; ok && gi.IsRepo {
+		branch := gi.Branch
+		if branch == "" {
+			branch = "?"
+		}
+		if gi.HasChanges {
+			gitStr = m.styles.GitDirty.Render("git:" + branch + "*")
+		} else {
+			gitStr = m.styles.GitClean.Render("git:" + branch)
+		}
+	}
+
+	row := fmt.Sprintf("  %s %s%s  %s  %-30s  %s",
+		icon,
+		checkbox,
+		nameStyle.Render(fmt.Sprintf("%-22s", nameText)),
+		execBadge,
+		m.styles.Path.Render(location),
+		gitStr,
+	)
+
+	if isCursor {
+		return m.styles.SelectedProject.Render(row)
+	}
+	return row
 }
 
 func (m Model) renderHelpBar() string {

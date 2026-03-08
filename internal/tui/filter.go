@@ -157,3 +157,68 @@ func getOriginalIndex(projects []projectWithIndex, cursor int) int {
 	}
 	return projects[cursor].index
 }
+
+// groupedRow is a single rendered line in the grouped layout — either a tag
+// header or a project entry.
+type groupedRow struct {
+	isHeader bool
+	tag      string // group name (header rows and project rows)
+	count    int    // number of projects in the group (header only)
+	pw       projectWithIndex
+}
+
+// buildGroupedRows converts a flat filtered list into grouped rows with headers.
+// Tags are sorted alphabetically; "Untagged" is always last.
+func buildGroupedRows(filtered []projectWithIndex) []groupedRow {
+	var tagOrder []string
+	groups := make(map[string][]projectWithIndex)
+
+	for _, pw := range filtered {
+		tag := "Untagged"
+		if len(pw.project.Tags) > 0 {
+			tag = pw.project.Tags[0]
+		}
+		if _, exists := groups[tag]; !exists {
+			tagOrder = append(tagOrder, tag)
+		}
+		groups[tag] = append(groups[tag], pw)
+	}
+
+	sort.Slice(tagOrder, func(i, j int) bool {
+		if tagOrder[i] == "Untagged" {
+			return false
+		}
+		if tagOrder[j] == "Untagged" {
+			return true
+		}
+		return strings.ToLower(tagOrder[i]) < strings.ToLower(tagOrder[j])
+	})
+
+	var rows []groupedRow
+	for gi, tag := range tagOrder {
+		// Blank separator between groups (not before the first).
+		if gi > 0 {
+			rows = append(rows, groupedRow{isHeader: false, tag: ""}) // blank spacer
+		}
+		rows = append(rows, groupedRow{isHeader: true, tag: tag, count: len(groups[tag])})
+		for _, pw := range groups[tag] {
+			rows = append(rows, groupedRow{pw: pw})
+		}
+	}
+	return rows
+}
+
+// findGroupedCursorRow returns the row index (in the grouped rows slice) that
+// corresponds to the project with the given original config index.
+func findGroupedCursorRow(originalIdx int, rows []groupedRow) int {
+	for i, row := range rows {
+		if !row.isHeader && row.tag == "" && row.pw.index == 0 {
+			// spacer row — skip
+			continue
+		}
+		if !row.isHeader && row.pw.index == originalIdx {
+			return i
+		}
+	}
+	return 0
+}

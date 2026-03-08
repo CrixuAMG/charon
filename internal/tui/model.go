@@ -33,6 +33,7 @@ const (
 	layoutTable
 	layoutTableCompact
 	layoutDetail
+	layoutGrouped // projects grouped under tag headers
 )
 
 func (l layoutMode) String() string {
@@ -47,6 +48,8 @@ func (l layoutMode) String() string {
 		return "table-compact"
 	case layoutDetail:
 		return "detail"
+	case layoutGrouped:
+		return "grouped"
 	default:
 		return "card"
 	}
@@ -215,7 +218,8 @@ const (
 	viewportOverhead     = viewportHeaderLines + viewportStatusLines + viewportHelpLines + viewportPaddingLines + viewportMessageLines
 )
 
-// viewportSize returns the number of list items that fit in the terminal.
+// viewportSize returns the number of list items (or rows for grouped layout)
+// that fit in the terminal.
 func (m Model) viewportSize() int {
 	if m.height == 0 {
 		return 20
@@ -239,11 +243,14 @@ func (m Model) viewportSize() int {
 		}
 		return available
 	case layoutDetail:
-		// ~6 lines per item (name, path, git, tags, tasks, stats)
-		if available < 6 {
+		// ~8 lines per item
+		if available < 8 {
 			return 1
 		}
-		return available / 6
+		return available / 8
+	case layoutGrouped:
+		// 1 line per row (headers and projects alike)
+		return available
 	default: // layoutCard
 		// 2 content lines (name+path, tasks) + 1 separator = 3 lines per item
 		if available < 3 {
@@ -251,6 +258,22 @@ func (m Model) viewportSize() int {
 		}
 		return available / 3
 	}
+}
+
+// adjustScrollForLayout computes the new scroll offset after the cursor moves.
+// For the grouped layout scrollOffset tracks row indices (including header rows);
+// for all other layouts it tracks project indices.
+func (m Model) adjustScrollForLayout(cursor int, filtered []projectWithIndex) int {
+	if m.currentLayout == layoutGrouped && len(filtered) > 0 {
+		rows := buildGroupedRows(filtered)
+		originalIdx := 0
+		if cursor < len(filtered) {
+			originalIdx = filtered[cursor].index
+		}
+		cursorRow := findGroupedCursorRow(originalIdx, rows)
+		return adjustScroll(cursorRow, m.scrollOffset, m.viewportSize())
+	}
+	return adjustScroll(cursor, m.scrollOffset, m.viewportSize())
 }
 
 // adjustScroll keeps cursor visible within the viewport.
@@ -367,14 +390,14 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 		}
-		m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
+		m.scrollOffset = m.adjustScrollForLayout(m.cursor, filtered)
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Down):
 		if m.cursor < len(filtered)-1 {
 			m.cursor++
 		}
-		m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
+		m.scrollOffset = m.adjustScrollForLayout(m.cursor, filtered)
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Enter):
@@ -431,7 +454,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Layout):
-		m.currentLayout = (m.currentLayout + 1) % 5
+		m.currentLayout = (m.currentLayout + 1) % 6
 		m.message = ""
 		// Save layout preference to config
 		m.config.Interface.Layout = m.currentLayout.String()
@@ -499,7 +522,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Last):
 		if len(filtered) > 0 {
 			m.cursor = len(filtered) - 1
-			m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
+			m.scrollOffset = m.adjustScrollForLayout(m.cursor, filtered)
 		}
 		m.message = ""
 
@@ -576,7 +599,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Advance cursor after toggling.
 			if m.cursor < len(filtered)-1 {
 				m.cursor++
-				m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
+				m.scrollOffset = m.adjustScrollForLayout(m.cursor, filtered)
 			}
 			m.message = ""
 		}
@@ -1062,6 +1085,8 @@ func (m Model) linesPerItem() int {
 		return 1
 	case layoutDetail:
 		return 8
+	case layoutGrouped:
+		return 1
 	default: // layoutCard
 		return 3
 	}
