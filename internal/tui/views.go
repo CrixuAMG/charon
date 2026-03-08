@@ -220,7 +220,7 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 	warningIcon := ""
 	icon := "○ "
 	pin := ""
-	if project.Exists == false {
+	if !project.Exists {
 		warningIcon = "⚠ "
 	}
 	if exec.Type == "docker" {
@@ -233,6 +233,18 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 	name := nameStyle.Render(icon + warningIcon + pin + project.Name)
 	content.WriteString(name)
 	content.WriteString(" ")
+
+	if gi, ok := m.gitInfos[project.Name]; ok && gi.IsRepo {
+		gitIndicator := m.styles.GitClean.Render("git")
+		if gi.HasChanges {
+			gitIndicator = m.styles.GitDirty.Render("git*")
+		}
+		content.WriteString(gitIndicator)
+		if gi.Branch != "" {
+			content.WriteString(m.styles.Subtext.Render(":"+gi.Branch))
+		}
+		content.WriteString(" ")
+	}
 
 	var pathInfo string
 	if exec.Type == "docker" {
@@ -500,7 +512,7 @@ func (m Model) renderProjectTableRow(project config.Project, selected bool, comp
 	warningIcon := ""
 	icon := "○"
 	pin := ""
-	if project.Exists == false {
+	if !project.Exists {
 		warningIcon = "⚠"
 	}
 	if exec.Type == "docker" {
@@ -542,6 +554,19 @@ func (m Model) renderProjectTableRow(project config.Project, selected bool, comp
 		pathText = "..." + pathText[len(pathText)-37:]
 	}
 	row.WriteString(m.styles.Path.Render(fmt.Sprintf("%-40s", pathText)))
+
+	// Git column
+	if gi, ok := m.gitInfos[project.Name]; ok && gi.IsRepo {
+		row.WriteString("  ")
+		if gi.HasChanges {
+			row.WriteString(m.styles.GitDirty.Render("git*"))
+		} else {
+			row.WriteString(m.styles.GitClean.Render("git "))
+		}
+		if gi.Branch != "" {
+			row.WriteString(m.styles.Subtext.Render(":" + gi.Branch))
+		}
+	}
 
 	// Tasks column (only in non-compact mode)
 	if !compact {

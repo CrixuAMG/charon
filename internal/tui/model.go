@@ -5,6 +5,7 @@ import (
 
 	"github.com/crixuamg/charon/internal/config"
 	"github.com/crixuamg/charon/internal/db"
+	gitinfo "github.com/crixuamg/charon/internal/git"
 	"github.com/crixuamg/charon/internal/kitty"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -12,6 +13,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// gitInfoMsg is sent asynchronously when git info for a project is loaded.
+type gitInfoMsg struct {
+	projectName string
+	info        gitinfo.Info
+}
 
 type layoutMode int
 
@@ -63,6 +70,7 @@ type Model struct {
 	formTasksFrom    string // selected taskset name or empty
 	formTasksetNames []string
 	scrollOffset int
+	gitInfos     map[string]gitinfo.Info
 	// Taskset management fields
 	tasksetCursor   int
 	editTasksetName string // name of taskset being edited
@@ -230,7 +238,14 @@ func (m Model) getFilteredProjects() []projectWithIndex {
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	var cmds []tea.Cmd
+	for _, p := range m.config.Projects {
+		p := p
+		cmds = append(cmds, func() tea.Msg {
+			return gitInfoMsg{projectName: p.Name, info: gitinfo.GetInfo(p.Path)}
+		})
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) Cleanup() {
@@ -244,6 +259,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+
+	case gitInfoMsg:
+		if m.gitInfos == nil {
+			m.gitInfos = make(map[string]gitinfo.Info)
+		}
+		m.gitInfos[msg.projectName] = msg.info
 		return m, nil
 
 	case tea.KeyMsg:

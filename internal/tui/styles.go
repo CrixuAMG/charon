@@ -81,6 +81,8 @@ type Styles struct {
 	HelpKey             lipgloss.Style
 	HelpDesc            lipgloss.Style
 	HelpSeparator       lipgloss.Style
+	GitClean            lipgloss.Style
+	GitDirty            lipgloss.Style
 	Error               lipgloss.Style
 	Success             lipgloss.Style
 	Container           lipgloss.Style
@@ -159,6 +161,12 @@ func NewStyles(theme Theme) Styles {
 		HelpSeparator: lipgloss.NewStyle().
 			Foreground(theme.Overlay).
 			SetString("│"),
+
+		GitClean: lipgloss.NewStyle().
+			Foreground(theme.Green),
+
+		GitDirty: lipgloss.NewStyle().
+			Foreground(theme.Yellow),
 
 		Error: lipgloss.NewStyle().
 			Foreground(theme.Red).
