@@ -244,7 +244,7 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 		}
 		content.WriteString(gitIndicator)
 		if gi.Branch != "" {
-			content.WriteString(m.styles.Subtext.Render(":"+gi.Branch))
+			content.WriteString(m.styles.Subtext.Render(":" + gi.Branch))
 		}
 		content.WriteString(" ")
 	}

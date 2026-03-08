@@ -45,33 +45,35 @@ func (l layoutMode) String() string {
 }
 
 type Model struct {
-	config        *config.Config
-	db            *db.DB
-	cursor        int
-	message       string
-	isError       bool
-	width         int
-	height        int
-	quitting      bool
-	state         viewState
-	formInputs    []textinput.Model
-	formFocus     int
-	editIndex     int
-	searchQuery   string
-	searchMode    bool
-	currentSort   sortMode
-	currentFilter filterMode
-	activeTag     string
-	currentLayout layoutMode
-	styles        Styles
-	keys          keyMap
+	config           *config.Config
+	db               *db.DB
+	cursor           int
+	message          string
+	isError          bool
+	width            int
+	height           int
+	quitting         bool
+	state            viewState
+	formInputs       []textinput.Model
+	formFocus        int
+	editIndex        int
+	searchQuery      string
+	searchMode       bool
+	searchHistory    []string
+	searchHistoryIdx int
+	currentSort      sortMode
+	currentFilter    filterMode
+	activeTag        string
+	currentLayout    layoutMode
+	styles           Styles
+	keys             keyMap
 	// Form-specific fields
 	formPinned       bool
 	formExecType     string // "local" or "docker"
 	formTasksFrom    string // selected taskset name or empty
 	formTasksetNames []string
-	scrollOffset int
-	gitInfos     map[string]gitinfo.Info
+	scrollOffset     int
+	gitInfos         map[string]gitinfo.Info
 	// Taskset management fields
 	tasksetCursor   int
 	editTasksetName string // name of taskset being edited
@@ -427,22 +429,49 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+const maxSearchHistory = 20
+
 func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.searchMode = false
 		m.searchQuery = ""
+		m.searchHistoryIdx = 0
 		m.cursor = 0
 		return m, nil
 
 	case tea.KeyEnter:
+		if m.searchQuery != "" {
+			m.searchHistory = appendUniqueHistory(m.searchHistory, m.searchQuery, maxSearchHistory)
+		}
 		m.searchMode = false
+		m.searchHistoryIdx = 0
 		m.cursor = 0
 		return m, nil
+
+	case tea.KeyUp:
+		if m.searchHistoryIdx < len(m.searchHistory) {
+			m.searchHistoryIdx++
+			m.searchQuery = m.searchHistory[len(m.searchHistory)-m.searchHistoryIdx]
+			m.cursor = 0
+			m.scrollOffset = 0
+		}
+
+	case tea.KeyDown:
+		if m.searchHistoryIdx > 1 {
+			m.searchHistoryIdx--
+			m.searchQuery = m.searchHistory[len(m.searchHistory)-m.searchHistoryIdx]
+		} else if m.searchHistoryIdx == 1 {
+			m.searchHistoryIdx = 0
+			m.searchQuery = ""
+		}
+		m.cursor = 0
+		m.scrollOffset = 0
 
 	case tea.KeyBackspace:
 		if len(m.searchQuery) > 0 {
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+			m.searchHistoryIdx = 0
 			m.cursor = 0
 			m.scrollOffset = 0
 		} else {
@@ -451,11 +480,23 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyRunes:
 		m.searchQuery += string(msg.Runes)
+		m.searchHistoryIdx = 0
 		m.cursor = 0
 		m.scrollOffset = 0
 	}
 
 	return m, nil
+}
+
+func appendUniqueHistory(history []string, query string, max int) []string {
+	if len(history) > 0 && history[len(history)-1] == query {
+		return history
+	}
+	history = append(history, query)
+	if len(history) > max {
+		history = history[1:]
+	}
+	return history
 }
 
 // getInputIndex maps logical form field index to formInputs array index.
