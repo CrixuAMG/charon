@@ -41,6 +41,7 @@ func main() {
 	router.Add(commands.NewHelp(router))
 	router.Add(commands.NewEdit())
 	router.Add(commands.NewAdd())
+	router.Add(commands.NewExportAliases())
 
 	if err := router.Run(ctx, flag.Args()); err != nil {
 		log.Fatal(err)

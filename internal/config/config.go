@@ -21,6 +21,7 @@ type Hooks struct {
 
 type Project struct {
 	Name      string            `yaml:"name"`
+	Alias     string            `yaml:"alias,omitempty"`
 	Pinned    bool              `yaml:"pinned,omitempty"`
 	Archived  bool              `yaml:"archived,omitempty"`
 	Path      string            `yaml:"path"`
@@ -190,7 +191,7 @@ func (c *Config) Validate() []string {
 
 func (c *Config) FindProject(name string) (*Project, error) {
 	for i := range c.Projects {
-		if c.Projects[i].Name == name {
+		if c.Projects[i].Name == name || (c.Projects[i].Alias != "" && c.Projects[i].Alias == name) {
 			return &c.Projects[i], nil
 		}
 	}
