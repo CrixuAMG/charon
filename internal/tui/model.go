@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	"github.com/crixuamg/charon/internal/browser"
 	"github.com/crixuamg/charon/internal/config"
@@ -89,8 +90,11 @@ type Model struct {
 	inputFocus     int
 	pendingProject *config.Project
 	// Multi-select / bulk operations
-	selected         map[int]bool // keyed by original config.Projects index
-	pendingBulkOp    bulkAction
+	selected      map[int]bool // keyed by original config.Projects index
+	pendingBulkOp bulkAction
+	// Mouse support
+	lastClickY    int
+	lastClickTime time.Time
 }
 
 func NewModel(cfg *config.Config) Model {
@@ -294,6 +298,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.gitInfos[msg.projectName] = msg.info
 		return m, nil
+
+	case tea.MouseMsg:
+		if m.state == stateList && !m.searchMode {
+			return m.updateMouse(msg)
+		}
 
 	case tea.KeyMsg:
 		switch m.state {
@@ -931,6 +940,108 @@ func (m Model) updateBulkConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, key.NewBinding(key.WithKeys("n", "esc", "q"))):
 		m.state = stateList
+	}
+
+	return m, nil
+}
+
+// linesPerItem returns the number of terminal rows each project occupies.
+func (m Model) linesPerItem() int {
+	switch m.currentLayout {
+	case layoutCardCompact:
+		return 2
+	case layoutTable, layoutTableCompact:
+		return 1
+	case layoutDetail:
+		return 8
+	default: // layoutCard
+		return 3
+	}
+}
+
+// listStartY returns the approximate terminal row where the project list begins.
+// Accounts for the header (title + blank), status bar (1-2 lines + blank),
+// and container top padding (1).
+func (m Model) listStartY() int {
+	return 5
+}
+
+// doubleClickThreshold is the maximum duration between two clicks to be
+// considered a double-click.
+const doubleClickThreshold = 400 * time.Millisecond
+
+func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Button != tea.MouseButtonLeft || msg.Action != tea.MouseActionRelease {
+		return m, nil
+	}
+
+	filtered := m.getFilteredProjects()
+	if len(filtered) == 0 {
+		return m, nil
+	}
+
+	startY := m.listStartY()
+	lines := m.linesPerItem()
+
+	// For table layouts, account for the 2-line header.
+	tableHeaderOffset := 0
+	if m.currentLayout == layoutTable || m.currentLayout == layoutTableCompact {
+		tableHeaderOffset = 2
+	}
+
+	relY := msg.Y - startY - tableHeaderOffset
+	if relY < 0 {
+		return m, nil
+	}
+
+	itemIdx := m.scrollOffset + relY/lines
+	if itemIdx < 0 || itemIdx >= len(filtered) {
+		return m, nil
+	}
+
+	now := time.Now()
+	isDoubleClick := msg.Y == m.lastClickY && now.Sub(m.lastClickTime) < doubleClickThreshold
+
+	m.lastClickY = msg.Y
+	m.lastClickTime = now
+
+	if isDoubleClick && m.cursor == itemIdx {
+		// Open the project on double-click.
+		project := filtered[itemIdx].project
+		taskList := tasks.EffectiveTasks(project, m.config)
+		labels := tasks.Placeholders(taskList)
+		if len(labels) > 0 {
+			m.pendingProject = &project
+			m.inputLabels = labels
+			m.inputValues = make(map[string]string)
+			m.inputFocus = 0
+			m.formInputs = make([]textinput.Model, len(labels))
+			for i, label := range labels {
+				m.formInputs[i] = textinput.New()
+				m.formInputs[i].Placeholder = label
+				m.formInputs[i].CharLimit = 200
+				m.formInputs[i].Width = 40
+			}
+			m.formInputs[0].Focus()
+			m.state = stateInput
+			m.message = ""
+			return m, textinput.Blink
+		}
+		if err := kitty.OpenProject(project, m.config); err != nil {
+			m.message = "Error: " + err.Error()
+			m.isError = true
+		} else {
+			if m.db != nil {
+				_ = m.db.RecordAccess(project.Name)
+			}
+			m.quitting = true
+			return m, tea.Quit
+		}
+	} else {
+		// Single click: move cursor.
+		m.cursor = itemIdx
+		m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
+		m.message = ""
 	}
 
 	return m, nil

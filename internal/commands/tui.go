@@ -23,7 +23,7 @@ func (c *TUICommand) Run(ctx *app.Context, _ []string) error {
 	model := tui.NewModel(ctx.Config)
 	defer model.Cleanup()
 
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }
