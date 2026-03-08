@@ -1,0 +1,3 @@
+# Configuration settings for Charon
+# To modify the 'disableHistory' setting, change the value to 'true' or 'false'.
+disableHistory: false
