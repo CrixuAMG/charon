@@ -311,6 +311,7 @@ func (m Model) renderHelpBar() string {
 				m.helpItem("f", "filter"),
 				m.helpItem("T", "tag"),
 				m.helpItem("l", "layout"),
+				m.helpItem("ctrl+o", "reveal"),
 				m.helpItem("a", "add"),
 				m.helpItem("e", "edit"),
 				m.helpItem("d", "delete"),

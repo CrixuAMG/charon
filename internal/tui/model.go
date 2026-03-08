@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	"github.com/crixuamg/charon/internal/browser"
 	"github.com/crixuamg/charon/internal/config"
 	"github.com/crixuamg/charon/internal/db"
 	gitinfo "github.com/crixuamg/charon/internal/git"
@@ -424,6 +425,17 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
 		}
 		m.message = ""
+
+	case key.Matches(msg, m.keys.RevealPath):
+		if len(filtered) > 0 {
+			path := filtered[m.cursor].project.Path
+			if err := browser.Open(path); err != nil {
+				m.message = "Failed to open: " + err.Error()
+				m.isError = true
+			} else {
+				m.message = ""
+			}
+		}
 	}
 
 	return m, nil
