@@ -45,12 +45,13 @@ func matchesFilter(p config.Project, cfg *config.Config, filter filterMode) bool
 }
 
 func fuzzyFilterProjects(projects []projectWithIndex, query string) []projectWithIndex {
-	names := make([]string, len(projects))
+	// Search across name and path so users can find projects by location too.
+	targets := make([]string, len(projects))
 	for i, p := range projects {
-		names[i] = p.project.Name
+		targets[i] = p.project.Name + " " + p.project.Path
 	}
 
-	matches := fuzzy.Find(query, names)
+	matches := fuzzy.Find(query, targets)
 	if len(matches) == 0 {
 		return nil
 	}
