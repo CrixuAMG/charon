@@ -49,7 +49,10 @@ type Interface struct {
 	Layout string `yaml:"layout,omitempty"` // card, card-compact, table, table-compact
 }
 
+const currentConfigVersion = 2
+
 type Config struct {
+	Version   int                 `yaml:"version,omitempty"`
 	Execution *Execution          `yaml:"execution"`
 	Theme     string              `yaml:"theme"`
 	Interface Interface           `yaml:"interface,omitempty"`
@@ -104,6 +107,8 @@ func LoadFrom(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	migrate(&cfg)
+
 	for i := range cfg.Projects {
 		cfg.Projects[i].Path = expandPath(cfg.Projects[i].Path)
 	}
@@ -143,6 +148,14 @@ func Save(cfg *Config) error {
 	}
 
 	return nil
+}
+
+// migrate upgrades a config from an older schema version to the current one.
+// All migrations are idempotent and additive so existing configs continue to work.
+func migrate(cfg *Config) {
+	// v0/v1 → v2: no structural changes yet; just stamp the version.
+	// Future migrations go here as: if cfg.Version < N { ... }
+	cfg.Version = currentConfigVersion
 }
 
 func expandPath(path string) string {
