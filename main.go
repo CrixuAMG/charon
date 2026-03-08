@@ -1,8 +1,8 @@
 package main
 
 import (
+	"flag"
 	"log"
-	"os"
 
 	"github.com/crixuamg/charon/internal/app"
 	"github.com/crixuamg/charon/internal/commands"
@@ -13,7 +13,10 @@ func main() {
 	log.SetPrefix("charon: ")
 	log.SetFlags(0)
 
-	cfg, err := config.Load()
+	configFlag := flag.String("config", "", "path to config file (overrides CHARON_CONFIG and default location)")
+	flag.Parse()
+
+	cfg, err := config.LoadFrom(*configFlag)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +42,7 @@ func main() {
 	router.Add(commands.NewEdit())
 	router.Add(commands.NewAdd())
 
-	if err := router.Run(ctx, os.Args[1:]); err != nil {
+	if err := router.Run(ctx, flag.Args()); err != nil {
 		log.Fatal(err)
 	}
 }

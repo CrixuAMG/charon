@@ -50,7 +50,12 @@ type Config struct {
 }
 
 // ConfigPath returns the absolute path to the charon config file.
+// If CHARON_CONFIG is set it takes precedence; otherwise the default location
+// (~/.config/charon/.charon.yaml) is used.
 func ConfigPath() (string, error) {
+	if env := os.Getenv("CHARON_CONFIG"); env != "" {
+		return filepath.Abs(env)
+	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
@@ -58,8 +63,21 @@ func ConfigPath() (string, error) {
 	return filepath.Join(homeDir, ".config", "charon", ".charon.yaml"), nil
 }
 
+// ConfigPathFrom returns the path to use for a given explicit override.
+// When override is empty it falls back to ConfigPath().
+func ConfigPathFrom(override string) (string, error) {
+	if override != "" {
+		return filepath.Abs(override)
+	}
+	return ConfigPath()
+}
+
 func Load() (*Config, error) {
-	configPath, err := ConfigPath()
+	return LoadFrom("")
+}
+
+func LoadFrom(path string) (*Config, error) {
+	configPath, err := ConfigPathFrom(path)
 	if err != nil {
 		return nil, err
 	}
