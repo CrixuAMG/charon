@@ -18,7 +18,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app.AutoDiscover(cfg)
+	if err := app.AutoDiscover(cfg); err != nil {
+		log.Printf("warning: autodiscover: %v", err)
+	}
 	app.UpdateProjectStatus(cfg)
 
 	ctx := &app.Context{

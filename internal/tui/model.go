@@ -62,6 +62,7 @@ type Model struct {
 	formExecType     string // "local" or "docker"
 	formTasksFrom    string // selected taskset name or empty
 	formTasksetNames []string
+	scrollOffset int
 	// Taskset management fields
 	tasksetCursor   int
 	editTasksetName string // name of taskset being edited
@@ -169,6 +170,59 @@ func (m *Model) initFormInputs(project *config.Project) {
 	m.formInputs[0].Focus()
 }
 
+// Fixed line counts that consume vertical space outside the project list.
+const (
+	viewportHeaderLines  = 2 // title + blank line
+	viewportStatusLines  = 2 // status bar + blank line
+	viewportHelpLines    = 1
+	viewportPaddingLines = 2 // container top + bottom padding
+	viewportMessageLines = 2 // reserve for status/error message
+	viewportOverhead     = viewportHeaderLines + viewportStatusLines + viewportHelpLines + viewportPaddingLines + viewportMessageLines
+)
+
+// viewportSize returns the number of list items that fit in the terminal.
+func (m Model) viewportSize() int {
+	if m.height == 0 {
+		return 20
+	}
+	available := m.height - viewportOverhead
+	if available < 1 {
+		return 1
+	}
+	switch m.currentLayout {
+	case layoutCardCompact:
+		// 1 content line + 1 separator = 2 lines per item
+		if available < 2 {
+			return 1
+		}
+		return available / 2
+	case layoutTable, layoutTableCompact:
+		// 2 header lines + 1 line per row
+		available -= 2
+		if available < 1 {
+			return 1
+		}
+		return available
+	default: // layoutCard
+		// 2 content lines (name+path, tasks) + 1 separator = 3 lines per item
+		if available < 3 {
+			return 1
+		}
+		return available / 3
+	}
+}
+
+// adjustScroll keeps cursor visible within the viewport.
+func adjustScroll(cursor, offset, viewSize int) int {
+	if cursor < offset {
+		return cursor
+	}
+	if cursor >= offset+viewSize {
+		return cursor - viewSize + 1
+	}
+	return offset
+}
+
 func (m Model) getFilteredProjects() []projectWithIndex {
 	filtered := filterProjects(m.config.Projects, m.config, m.currentFilter, m.searchQuery)
 	sortProjects(filtered, m.currentSort, m.db)
@@ -228,12 +282,14 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 		}
+		m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Down):
 		if m.cursor < len(filtered)-1 {
 			m.cursor++
 		}
+		m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Enter):
@@ -260,11 +316,13 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Sort):
 		m.currentSort = (m.currentSort + 1) % 3
 		m.cursor = 0
+		m.scrollOffset = 0
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Filter):
 		m.currentFilter = (m.currentFilter + 1) % 3
 		m.cursor = 0
+		m.scrollOffset = 0
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Layout):
@@ -305,11 +363,13 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.First):
 		m.cursor = 0
+		m.scrollOffset = 0
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Last):
 		if len(filtered) > 0 {
 			m.cursor = len(filtered) - 1
+			m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
 		}
 		m.message = ""
 	}
@@ -334,6 +394,7 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.searchQuery) > 0 {
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
 			m.cursor = 0
+			m.scrollOffset = 0
 		} else {
 			m.searchMode = false
 		}
@@ -341,6 +402,7 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyRunes:
 		m.searchQuery += string(msg.Runes)
 		m.cursor = 0
+		m.scrollOffset = 0
 	}
 
 	return m, nil

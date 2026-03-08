@@ -4,13 +4,10 @@ import (
 	"fmt"
 
 	"github.com/crixuamg/charon/internal/app"
-	"github.com/crixuamg/charon/internal/config"
 	"github.com/crixuamg/charon/internal/kitty"
 )
 
-type OpenCommand struct {
-	cfg config.Config
-}
+type OpenCommand struct{}
 
 func NewOpen() *OpenCommand {
 	return &OpenCommand{}

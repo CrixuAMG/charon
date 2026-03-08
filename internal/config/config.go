@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -46,7 +47,8 @@ type Config struct {
 	TaskSets  map[string][]string `yaml:"task_sets,omitempty"`
 }
 
-func getConfigPath() (string, error) {
+// ConfigPath returns the absolute path to the charon config file.
+func ConfigPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
@@ -55,7 +57,7 @@ func getConfigPath() (string, error) {
 }
 
 func Load() (*Config, error) {
-	configPath, err := getConfigPath()
+	configPath, err := ConfigPath()
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +65,6 @@ func Load() (*Config, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Return empty config if file doesn't exist
 			return &Config{Projects: []Project{}}, nil
 		}
 		return nil, fmt.Errorf("failed to read config file %s: %w", configPath, err)
@@ -74,7 +75,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Expand ~ in paths
 	for i := range cfg.Projects {
 		cfg.Projects[i].Path = expandPath(cfg.Projects[i].Path)
 	}
@@ -87,18 +87,16 @@ func Load() (*Config, error) {
 }
 
 func Save(cfg *Config) error {
-	configPath, err := getConfigPath()
+	configPath, err := ConfigPath()
 	if err != nil {
 		return err
 	}
 
-	// Ensure directory exists
-	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Contract paths back to ~ for saving
+	// Contract paths back to ~ for saving.
 	saveCfg := *cfg
 	saveCfg.Projects = make([]Project, len(cfg.Projects))
 	for i, p := range cfg.Projects {
@@ -134,7 +132,7 @@ func contractPath(path string) string {
 	if err != nil {
 		return path
 	}
-	if len(path) >= len(homeDir) && path[:len(homeDir)] == homeDir {
+	if strings.HasPrefix(path, homeDir) {
 		return "~" + path[len(homeDir):]
 	}
 	return path
@@ -150,12 +148,11 @@ func (c *Config) FindProject(name string) (*Project, error) {
 }
 
 func (c *Config) HasProjectPath(path string) bool {
-	for _, project := range c.Projects {
-		if project.Path == path {
+	for _, p := range c.Projects {
+		if p.Path == path {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -168,18 +165,4 @@ func ProjectFromPath(path string) Project {
 		Name: filepath.Base(path),
 		Path: path,
 	}
-}
-
-func ConfigPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("get home dir: %w", err)
-	}
-
-	return filepath.Join(
-		home,
-		".config",
-		"charon",
-		".charon.yaml",
-	), nil
 }

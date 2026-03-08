@@ -18,7 +18,7 @@ func findKittySocket() (string, error) {
 
 	matches, err := filepath.Glob("/tmp/kitty-*")
 	if err != nil {
-		return "", fmt.Errorf("search kitty socket: %w", err)
+		return "", fmt.Errorf("failed to search kitty socket: %w", err)
 	}
 
 	if len(matches) == 0 {
@@ -36,21 +36,14 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 
 	taskList := tasks.EffectiveTasks(project, cfg)
 	if len(taskList) == 0 {
-		return fmt.Errorf("no tasks defined for project %s", project.Name)
+		return fmt.Errorf("no tasks defined for project %q", project.Name)
 	}
 
-	// Concrete terminal implementation (implements execution.Terminal)
-	term := Terminal{}
+	execCfg := execution.Resolve(cfg, project)
+	executor := execution.NewExecutor(execCfg, Terminal{})
 
 	for _, task := range taskList {
-		title := getTabTitle(task)
-
-		// Resolve execution context (global → project → task [later])
-		execCfg := execution.Resolve(cfg, project)
-
-		executor := execution.NewExecutor(execCfg, term)
-
-		if err := executor.OpenTab(socket, title, project, task); err != nil {
+		if err := executor.OpenTab(socket, getTabTitle(task), project, task); err != nil {
 			return fmt.Errorf("open tab for %q: %w", task, err)
 		}
 	}

@@ -6,6 +6,10 @@ import (
 	"github.com/crixuamg/charon/internal/config"
 )
 
+// dockerStartupDelay gives the docker exec session time to be ready
+// before sending commands.
+const dockerStartupDelay = 1 * time.Second
+
 type DockerExecutor struct {
 	Container string
 	Terminal  Terminal
@@ -22,7 +26,7 @@ func (e DockerExecutor) OpenTab(
 		return err
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(dockerStartupDelay)
 
 	return e.Terminal.SendText(socket, id, task+"\n")
 }

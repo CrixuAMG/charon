@@ -24,14 +24,15 @@ func (c *HelpCommand) Help() string {
 func (c *HelpCommand) Run(_ *app.Context, _ []string) error {
 	fmt.Println("Usage: charon <command>")
 
-	var names []string
-	for name := range c.router.All() {
+	cmds := c.router.All()
+	names := make([]string, 0, len(cmds))
+	for name := range cmds {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
 	for _, name := range names {
-		fmt.Println(c.router.All()[name].Help())
+		fmt.Println(cmds[name].Help())
 	}
 	return nil
 }

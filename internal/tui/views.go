@@ -46,19 +46,38 @@ func (m Model) viewList() string {
 		b.WriteString(m.styles.Path.Render(emptyMsg))
 		b.WriteString("\n\n")
 	} else {
+		viewSize := m.viewportSize()
+		offset := m.scrollOffset
+		end := offset + viewSize
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+		visible := filtered[offset:end]
+
+		if offset > 0 {
+			b.WriteString(m.styles.Subtext.Render(fmt.Sprintf("  ↑ %d more", offset)))
+			b.WriteString("\n")
+		}
+
 		switch m.currentLayout {
 		case layoutTable, layoutTableCompact:
-			b.WriteString(m.renderProjectsTable(filtered))
+			b.WriteString(m.renderProjectsTable(visible))
 		default:
-			for i, pw := range filtered {
-				isSelected := i == m.cursor
+			for i, pw := range visible {
+				isSelected := (offset + i) == m.cursor
 				b.WriteString(m.renderProjectCard(pw.project, isSelected))
-				if i < len(filtered)-1 {
+				if i < len(visible)-1 {
 					b.WriteString("\n")
 				}
 			}
 		}
 		b.WriteString("\n")
+
+		remaining := len(filtered) - end
+		if remaining > 0 {
+			b.WriteString(m.styles.Subtext.Render(fmt.Sprintf("  ↓ %d more", remaining)))
+			b.WriteString("\n")
+		}
 	}
 
 	if m.message != "" {

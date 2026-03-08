@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 )
 
 type Terminal struct{}
@@ -17,7 +16,6 @@ func (Terminal) LaunchLocalTab(
 	title string,
 	path string,
 ) (int, error) {
-
 	cmd := exec.Command(
 		"kitty", "@", "--to", socket,
 		"launch", "--type=tab",
@@ -32,11 +30,8 @@ func (Terminal) LaunchLocalTab(
 
 	id, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("parse window id from output %q: %w", string(output), err)
 	}
-
-	// optional delay for shell init
-	time.Sleep(300 * time.Millisecond)
 
 	return id, nil
 }
@@ -47,7 +42,6 @@ func (Terminal) LaunchDockerTab(
 	container string,
 	workdir string,
 ) (int, error) {
-
 	args := []string{
 		"@", "--to", socket,
 		"launch", "--type=tab",
@@ -59,10 +53,7 @@ func (Terminal) LaunchDockerTab(
 	}
 
 	cmd := exec.Command("kitty", args...)
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -73,8 +64,6 @@ func (Terminal) LaunchDockerTab(
 	if err != nil {
 		return 0, fmt.Errorf("parse window id from output %q: %w", string(output), err)
 	}
-
-	time.Sleep(1 * time.Second)
 
 	return id, nil
 }

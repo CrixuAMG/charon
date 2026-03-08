@@ -4,13 +4,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/crixuamg/charon/internal/app"
-	"github.com/crixuamg/charon/internal/config"
 	"github.com/crixuamg/charon/internal/tui"
 )
 
-type TUICommand struct {
-	cfg config.Config
-}
+type TUICommand struct{}
 
 func NewTUI() *TUICommand {
 	return &TUICommand{}
