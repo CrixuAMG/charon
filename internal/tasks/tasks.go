@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/crixuamg/charon/internal/config"
+	"github.com/crixuamg/charon/internal/git"
 )
 
 // Context holds variables available for task template expansion.
@@ -32,6 +33,7 @@ func EffectiveTasks(p config.Project, cfg *config.Config) []string {
 		"PROJECT": p.Name,
 		"PATH":    p.Path,
 		"DATE":    time.Now().Format("2006-01-02"),
+		"BRANCH":  git.Branch(p.Path),
 	}
 
 	for i, task := range taskList {
