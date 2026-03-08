@@ -21,6 +21,7 @@ type Project struct {
 	Execution *Execution `yaml:"execution"`
 	Tasks     []string   `yaml:"tasks,omitempty"`
 	TasksFrom string     `yaml:"tasks_from,omitempty"`
+	Tags      []string   `yaml:"tags,omitempty"`
 
 	Exists bool `yaml:"-"`
 }

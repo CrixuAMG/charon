@@ -23,6 +23,7 @@ type keyMap struct {
 	Confirm   key.Binding
 	Deny      key.Binding
 	Tasksets  key.Binding
+	TagFilter key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -106,6 +107,10 @@ func defaultKeyMap() keyMap {
 		Tasksets: key.NewBinding(
 			key.WithKeys("t"),
 			key.WithHelp("t", "tasksets"),
+		),
+		TagFilter: key.NewBinding(
+			key.WithKeys("T"),
+			key.WithHelp("T", "tag filter"),
 		),
 	}
 }

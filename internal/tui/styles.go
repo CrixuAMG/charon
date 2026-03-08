@@ -83,6 +83,7 @@ type Styles struct {
 	HelpSeparator       lipgloss.Style
 	GitClean            lipgloss.Style
 	GitDirty            lipgloss.Style
+	TagBadge            lipgloss.Style
 	Error               lipgloss.Style
 	Success             lipgloss.Style
 	Container           lipgloss.Style
@@ -167,6 +168,10 @@ func NewStyles(theme Theme) Styles {
 
 		GitDirty: lipgloss.NewStyle().
 			Foreground(theme.Yellow),
+
+		TagBadge: lipgloss.NewStyle().
+			Foreground(theme.Lavender).
+			Bold(true),
 
 		Error: lipgloss.NewStyle().
 			Foreground(theme.Red).

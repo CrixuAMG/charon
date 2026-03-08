@@ -16,11 +16,14 @@ type projectWithIndex struct {
 	index   int
 }
 
-func filterProjects(projects []config.Project, cfg *config.Config, filter filterMode, searchQuery string) []projectWithIndex {
+func filterProjects(projects []config.Project, cfg *config.Config, filter filterMode, activeTag string, searchQuery string) []projectWithIndex {
 	var filtered []projectWithIndex
 
 	for i, p := range projects {
 		if !matchesFilter(p, cfg, filter) {
+			continue
+		}
+		if activeTag != "" && !hasTag(p, activeTag) {
 			continue
 		}
 		filtered = append(filtered, projectWithIndex{project: p, index: i})
@@ -42,6 +45,30 @@ func matchesFilter(p config.Project, cfg *config.Config, filter filterMode) bool
 	default:
 		return true
 	}
+}
+
+func hasTag(p config.Project, tag string) bool {
+	for _, t := range p.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// AllTags returns a sorted, deduplicated list of all tags across all projects.
+func allTags(projects []config.Project) []string {
+	seen := make(map[string]struct{})
+	var tags []string
+	for _, p := range projects {
+		for _, t := range p.Tags {
+			if _, ok := seen[t]; !ok {
+				seen[t] = struct{}{}
+				tags = append(tags, t)
+			}
+		}
+	}
+	return tags
 }
 
 func fuzzyFilterProjects(projects []projectWithIndex, query string) []projectWithIndex {

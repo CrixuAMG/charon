@@ -21,6 +21,9 @@ func (m Model) viewList() string {
 	if m.currentFilter != filterNone {
 		statusParts = append(statusParts, m.styles.FilterBadge.Render("Filter: "+m.currentFilter.String()))
 	}
+	if m.activeTag != "" {
+		statusParts = append(statusParts, m.styles.FilterBadge.Render("Tag: "+m.activeTag))
+	}
 	if m.currentSort != sortByCustom {
 		statusParts = append(statusParts, m.styles.FilterBadge.Render("Sort: "+m.currentSort.String()))
 	}
@@ -99,7 +102,7 @@ func (m Model) viewForm(title string) string {
 	b.WriteString(m.styles.ProjectName.Render(title))
 	b.WriteString("\n\n")
 
-	// Field order: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6)
+	// Field order: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6), Tags(7)
 	fields := []struct {
 		index       int
 		label       string
@@ -114,10 +117,10 @@ func (m Model) viewForm(title string) string {
 		{4, "Container:", "Docker container name (only for docker execution)", m.formInputs[2].View(), true},
 		{5, "TasksFrom:", "Select taskset (arrows to cycle)", m.renderTasksFromField(), false},
 		{6, "Tasks:", "Comma-separated commands", m.formInputs[3].View(), true},
+		{7, "Tags:", "Comma-separated tags (e.g. work, infra)", m.formInputs[4].View(), true},
 	}
 
 	for _, field := range fields {
-		// Skip container field if execution type is local
 		if field.index == 4 && m.formExecType != "docker" {
 			continue
 		}
@@ -254,6 +257,16 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 	}
 	content.WriteString(pathInfo)
 
+	if len(project.Tags) > 0 {
+		content.WriteString("\n  ")
+		for i, tag := range project.Tags {
+			if i > 0 {
+				content.WriteString(" ")
+			}
+			content.WriteString(m.styles.TagBadge.Render("#" + tag))
+		}
+	}
+
 	// Show tasks based on layout mode
 	isCompact := m.currentLayout == layoutCardCompact
 	tasks := tasks.EffectiveTasks(project, m.config)
@@ -296,6 +309,7 @@ func (m Model) renderHelpBar() string {
 				m.helpItem("/", "search"),
 				m.helpItem("s", "sort"),
 				m.helpItem("f", "filter"),
+				m.helpItem("T", "tag"),
 				m.helpItem("l", "layout"),
 				m.helpItem("a", "add"),
 				m.helpItem("e", "edit"),

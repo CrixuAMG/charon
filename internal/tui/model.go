@@ -61,6 +61,7 @@ type Model struct {
 	searchMode    bool
 	currentSort   sortMode
 	currentFilter filterMode
+	activeTag     string
 	currentLayout layoutMode
 	styles        Styles
 	keys          keyMap
@@ -125,8 +126,8 @@ func getTheme(themeName string) Theme {
 }
 
 func (m *Model) initFormInputs(project *config.Project) {
-	// Form fields: Name, Path, Container (text input), Tasks, TasksFrom (text input for now)
-	m.formInputs = make([]textinput.Model, 4)
+	// Form fields: Name(0), Path(1), Container(2), Tasks(3), Tags(4)
+	m.formInputs = make([]textinput.Model, 5)
 
 	inputs := []struct {
 		placeholder string
@@ -137,6 +138,7 @@ func (m *Model) initFormInputs(project *config.Project) {
 		{"~/path/to/project", 200, ""},
 		{"container-name", 100, ""},
 		{"echo 'Hello World'; pwd;", 500, ""},
+		{"work, hobby, infra", 200, ""},
 	}
 
 	// Initialize form state
@@ -154,6 +156,7 @@ func (m *Model) initFormInputs(project *config.Project) {
 		inputs[0].value = project.Name
 		inputs[1].value = project.Path
 		inputs[3].value = strings.Join(project.Tasks, ", ")
+		inputs[4].value = strings.Join(project.Tags, ", ")
 
 		m.formPinned = project.Pinned
 		m.formTasksFrom = project.TasksFrom
@@ -232,7 +235,7 @@ func adjustScroll(cursor, offset, viewSize int) int {
 }
 
 func (m Model) getFilteredProjects() []projectWithIndex {
-	filtered := filterProjects(m.config.Projects, m.config, m.currentFilter, m.searchQuery)
+	filtered := filterProjects(m.config.Projects, m.config, m.currentFilter, m.activeTag, m.searchQuery)
 	sortProjects(filtered, m.currentSort, m.db)
 	return filtered
 }
@@ -378,6 +381,31 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = ""
 		}
 
+	case key.Matches(msg, m.keys.TagFilter):
+		tags := allTags(m.config.Projects)
+		if len(tags) == 0 {
+			break
+		}
+		if m.activeTag == "" {
+			m.activeTag = tags[0]
+		} else {
+			current := -1
+			for i, t := range tags {
+				if t == m.activeTag {
+					current = i
+					break
+				}
+			}
+			if current == -1 || current == len(tags)-1 {
+				m.activeTag = ""
+			} else {
+				m.activeTag = tags[current+1]
+			}
+		}
+		m.cursor = 0
+		m.scrollOffset = 0
+		m.message = ""
+
 	case key.Matches(msg, m.keys.Tasksets):
 		m.state = stateTasksetList
 		m.tasksetCursor = 0
@@ -430,10 +458,10 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// getInputIndex maps logical form field index to formInputs array index
-// Returns -1 if the field is not a text input
+// getInputIndex maps logical form field index to formInputs array index.
+// Returns -1 if the field is not a text input.
+// Field order: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6), Tags(7)
 func (m Model) getInputIndex(fieldIndex int) int {
-	// Field mapping: Name(0)→0, Path(1)→1, Pinned(2)→-1, ExecType(3)→-1, Container(4)→2, TasksFrom(5)→-1, Tasks(6)→3
 	switch fieldIndex {
 	case 0:
 		return 0 // Name
@@ -443,14 +471,16 @@ func (m Model) getInputIndex(fieldIndex int) int {
 		return 2 // Container
 	case 6:
 		return 3 // Tasks
+	case 7:
+		return 4 // Tags
 	default:
-		return -1 // Not a text input
+		return -1
 	}
 }
 
 func (m Model) updateForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Total fields: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6)
-	totalFields := 7
+	// Total fields: Name(0), Path(1), Pinned(2), ExecType(3), Container(4), TasksFrom(5), Tasks(6), Tags(7)
+	totalFields := 8
 
 	switch {
 	case key.Matches(msg, m.keys.Cancel):
@@ -569,6 +599,7 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 	path := strings.TrimSpace(m.formInputs[1].Value())
 	container := strings.TrimSpace(m.formInputs[2].Value())
 	tasksStr := strings.TrimSpace(m.formInputs[3].Value())
+	tagsStr := strings.TrimSpace(m.formInputs[4].Value())
 
 	if name == "" {
 		m.message = "Name is required"
@@ -585,12 +616,20 @@ func (m Model) saveProject() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	var tags []string
+	for _, t := range strings.Split(tagsStr, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			tags = append(tags, t)
+		}
+	}
+
 	project := config.Project{
 		Name:      name,
 		Path:      path,
 		Pinned:    m.formPinned,
 		Tasks:     tasks,
 		TasksFrom: m.formTasksFrom,
+		Tags:      tags,
 	}
 
 	// Set execution if not local or if container is specified
