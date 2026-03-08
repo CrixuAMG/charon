@@ -23,6 +23,10 @@ func main() {
 	}
 	app.UpdateProjectStatus(cfg)
 
+	for _, w := range cfg.Validate() {
+		log.Printf("warning: %s", w)
+	}
+
 	ctx := &app.Context{
 		Config: cfg,
 	}

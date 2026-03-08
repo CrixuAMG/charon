@@ -139,6 +139,29 @@ func contractPath(path string) string {
 	return path
 }
 
+// Validate checks the config for inconsistencies and returns a list of
+// human-readable warnings. It does not return errors — problems are non-fatal.
+func (c *Config) Validate() []string {
+	var warnings []string
+
+	for _, p := range c.Projects {
+		if p.TasksFrom != "" {
+			if _, ok := c.TaskSets[p.TasksFrom]; !ok {
+				warnings = append(warnings, fmt.Sprintf(
+					"project %q references unknown taskset %q", p.Name, p.TasksFrom,
+				))
+			}
+		}
+		if p.Execution != nil && p.Execution.Type == "docker" && p.Execution.Container == "" {
+			warnings = append(warnings, fmt.Sprintf(
+				"project %q uses docker execution but has no container name", p.Name,
+			))
+		}
+	}
+
+	return warnings
+}
+
 func (c *Config) FindProject(name string) (*Project, error) {
 	for i := range c.Projects {
 		if c.Projects[i].Name == name {
