@@ -3,29 +3,29 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up        key.Binding
-	Down      key.Binding
-	Enter     key.Binding
-	Search    key.Binding
-	Sort      key.Binding
-	Filter    key.Binding
-	Layout    key.Binding
-	Add       key.Binding
-	Edit      key.Binding
-	Delete    key.Binding
-	First     key.Binding
-	Last      key.Binding
-	Quit      key.Binding
-	Save      key.Binding
-	Cancel    key.Binding
-	NextField key.Binding
-	PrevField key.Binding
-	Confirm   key.Binding
-	Deny      key.Binding
-	Tasksets  key.Binding
-	TagFilter    key.Binding
-	RevealPath   key.Binding
-	Archive      key.Binding
+	Up            key.Binding
+	Down          key.Binding
+	Enter         key.Binding
+	Search        key.Binding
+	Sort          key.Binding
+	Filter        key.Binding
+	Layout        key.Binding
+	Add           key.Binding
+	Edit          key.Binding
+	Delete        key.Binding
+	First         key.Binding
+	Last          key.Binding
+	Quit          key.Binding
+	Save          key.Binding
+	Cancel        key.Binding
+	NextField     key.Binding
+	PrevField     key.Binding
+	Confirm       key.Binding
+	Deny          key.Binding
+	Tasksets      key.Binding
+	TagFilter     key.Binding
+	RevealPath    key.Binding
+	Archive       key.Binding
 	ToggleArchive key.Binding
 }
 

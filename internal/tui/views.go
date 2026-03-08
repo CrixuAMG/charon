@@ -614,3 +614,29 @@ func (m Model) renderProjectTableRow(project config.Project, selected bool, comp
 
 	return result
 }
+
+func (m Model) viewInput() string {
+	var b strings.Builder
+
+	b.WriteString(m.styles.ProjectName.Render("Parameters required"))
+	if m.pendingProject != nil {
+		b.WriteString(m.styles.Subtext.Render(" — " + m.pendingProject.Name))
+	}
+	b.WriteString("\n\n")
+
+	for i, label := range m.inputLabels {
+		lbl := m.styles.FormLabel.Render(label + ":")
+		b.WriteString(lbl)
+		if i == m.inputFocus {
+			b.WriteString(m.styles.SelectedProjectName.Render(m.formInputs[i].View()))
+		} else {
+			b.WriteString(m.formInputs[i].View())
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(m.styles.Subtext.Render("tab next  ctrl+s open  esc cancel"))
+
+	return m.styles.Form.Render(b.String())
+}

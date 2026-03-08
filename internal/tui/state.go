@@ -11,6 +11,7 @@ const (
 	stateTasksetAdd
 	stateTasksetEdit
 	stateTasksetDelete
+	stateInput // prompting for task template parameters
 )
 
 type sortMode int
