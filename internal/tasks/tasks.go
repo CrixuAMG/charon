@@ -1,7 +1,9 @@
 package tasks
 
 import (
+	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -54,6 +56,27 @@ func ApplyInputs(taskList []string, inputs map[string]string) []string {
 	return result
 }
 
+// envPrefix returns a shell prefix that exports the project's env vars,
+// e.g. "export KEY='value' && " for each key in sorted order.
+func envPrefix(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		// Single-quote the value and escape any embedded single quotes.
+		v := strings.ReplaceAll(env[k], "'", "'\\''")
+		parts[i] = fmt.Sprintf("export %s='%s'", k, v)
+	}
+	return strings.Join(parts, " && ") + " && "
+}
+
 // EffectiveTasks returns the final list of tasks for a project, with taskset
 // tasks prepended and all built-in template variables expanded.
 // ${label} placeholders are left in place for the caller to handle via
@@ -74,8 +97,14 @@ func EffectiveTasks(p config.Project, cfg *config.Config) []string {
 		"BRANCH":  git.Branch(p.Path),
 	}
 
+	// Add project env vars to the expansion context so $KEY works in tasks.
+	for k, v := range p.Env {
+		ctx[k] = v
+	}
+
+	prefix := envPrefix(p.Env)
 	for i, task := range taskList {
-		taskList[i] = expand(task, ctx)
+		taskList[i] = prefix + expand(task, ctx)
 	}
 
 	return taskList

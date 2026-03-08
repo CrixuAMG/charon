@@ -15,14 +15,15 @@ type TaskSets struct {
 }
 
 type Project struct {
-	Name      string     `yaml:"name"`
-	Pinned    bool       `yaml:"pinned,omitempty"`
-	Archived  bool       `yaml:"archived,omitempty"`
-	Path      string     `yaml:"path"`
-	Execution *Execution `yaml:"execution"`
-	Tasks     []string   `yaml:"tasks,omitempty"`
-	TasksFrom string     `yaml:"tasks_from,omitempty"`
-	Tags      []string   `yaml:"tags,omitempty"`
+	Name      string            `yaml:"name"`
+	Pinned    bool              `yaml:"pinned,omitempty"`
+	Archived  bool              `yaml:"archived,omitempty"`
+	Path      string            `yaml:"path"`
+	Execution *Execution        `yaml:"execution"`
+	Tasks     []string          `yaml:"tasks,omitempty"`
+	TasksFrom string            `yaml:"tasks_from,omitempty"`
+	Tags      []string          `yaml:"tags,omitempty"`
+	Env       map[string]string `yaml:"env,omitempty"`
 
 	Exists bool `yaml:"-"`
 }

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -721,7 +722,22 @@ func (m Model) renderProjectDetail(project config.Project, selected bool) string
 		content.WriteString("\n")
 	}
 
-	// ── Line 5: tags ─────────────────────────────────────────────────────────
+	// ── Line 5: env vars ─────────────────────────────────────────────────────
+	if len(project.Env) > 0 {
+		keys := make([]string, 0, len(project.Env))
+		for k := range project.Env {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		envParts := make([]string, len(keys))
+		for i, k := range keys {
+			envParts[i] = k + "=" + project.Env[k]
+		}
+		content.WriteString("  " + m.styles.Subtext.Render("env: "+strings.Join(envParts, "  ")))
+		content.WriteString("\n")
+	}
+
+	// ── Line 6: tags ─────────────────────────────────────────────────────────
 	if len(project.Tags) > 0 {
 		var tagParts []string
 		for _, tag := range project.Tags {
