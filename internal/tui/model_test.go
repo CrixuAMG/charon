@@ -3,8 +3,8 @@ package tui
 import (
 	"testing"
 
-	"github.com/crixuamg/charon/internal/config"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/crixuamg/charon/internal/config"
 )
 
 func newTestModel(projectNames ...string) Model {
