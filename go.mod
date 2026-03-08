@@ -1,6 +1,6 @@
 module github.com/crixuamg/charon
 
-go 1.25.5
+go 1.16
 
 require (
 	github.com/charmbracelet/bubbles v0.21.0
