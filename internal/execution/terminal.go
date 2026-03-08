@@ -14,6 +14,13 @@ type Terminal interface {
 		workdir string,
 	) (int, error)
 
+	LaunchSSHTab(
+		socket string,
+		title string,
+		host string,
+		remotePath string,
+	) (int, error)
+
 	SendText(
 		socket string,
 		windowID int,

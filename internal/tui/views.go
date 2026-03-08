@@ -283,9 +283,16 @@ func (m Model) renderProjectCard(project config.Project, selected bool, multiSel
 	}
 
 	var pathInfo string
-	if exec.Type == "docker" {
+	switch exec.Type {
+	case "docker":
 		pathInfo = m.styles.DockerBadge.Render("docker") + " " + m.styles.Path.Render(project.Path+"/"+project.Name)
-	} else {
+	case "ssh":
+		remoteAddr := ""
+		if project.SSH != nil {
+			remoteAddr = project.SSH.Host + ":" + project.SSH.Path
+		}
+		pathInfo = m.styles.LocalBadge.Render("ssh") + " " + m.styles.Path.Render(remoteAddr)
+	default:
 		pathInfo = m.styles.LocalBadge.Render("local") + " " + m.styles.Path.Render(project.Path)
 	}
 	content.WriteString(pathInfo)
@@ -759,16 +766,23 @@ func (m Model) renderProjectDetail(project config.Project, selected bool, multiS
 	}
 
 	line1 := nameStyle.Render(icon+prefix+project.Name) + "  "
-	if exec.Type == "docker" {
+	switch exec.Type {
+	case "docker":
 		line1 += m.styles.DockerBadge.Render("docker")
-	} else {
+	case "ssh":
+		line1 += m.styles.LocalBadge.Render("ssh")
+	default:
 		line1 += m.styles.LocalBadge.Render("local")
 	}
 	content.WriteString(line1)
 	content.WriteString("\n")
 
-	// ── Line 2: path ─────────────────────────────────────────────────────────
-	content.WriteString("  " + m.styles.Path.Render(project.Path))
+	// ── Line 2: path / SSH host ───────────────────────────────────────────────
+	if project.SSH != nil {
+		content.WriteString("  " + m.styles.Path.Render(project.SSH.Host+":"+project.SSH.Path))
+	} else {
+		content.WriteString("  " + m.styles.Path.Render(project.Path))
+	}
 	content.WriteString("\n")
 
 	// ── Line 3: git info ─────────────────────────────────────────────────────

@@ -58,7 +58,7 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 	}
 
 	execCfg := execution.Resolve(cfg, project)
-	executor := execution.NewExecutor(execCfg, Terminal{})
+	executor := execution.NewExecutorForProject(execCfg, project, Terminal{})
 
 	for _, task := range taskList {
 		if err := executor.OpenTab(socket, getTabTitle(task), project, task); err != nil {

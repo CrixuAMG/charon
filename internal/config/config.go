@@ -19,6 +19,11 @@ type Hooks struct {
 	After  string `yaml:"after,omitempty"`
 }
 
+type SSHConfig struct {
+	Host string `yaml:"host"` // user@example.com
+	Path string `yaml:"path"` // remote path, e.g. /var/www/myapp
+}
+
 type Project struct {
 	Name      string            `yaml:"name"`
 	Alias     string            `yaml:"alias,omitempty"`
@@ -27,6 +32,7 @@ type Project struct {
 	Archived  bool              `yaml:"archived,omitempty"`
 	Path      string            `yaml:"path"`
 	Execution *Execution        `yaml:"execution"`
+	SSH       *SSHConfig        `yaml:"ssh,omitempty"`
 	Tasks     []string          `yaml:"tasks,omitempty"`
 	TasksFrom string            `yaml:"tasks_from,omitempty"`
 	Tags      []string          `yaml:"tags,omitempty"`

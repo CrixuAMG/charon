@@ -68,6 +68,35 @@ func (Terminal) LaunchDockerTab(
 	return id, nil
 }
 
+func (Terminal) LaunchSSHTab(
+	socket string,
+	title string,
+	host string,
+	remotePath string,
+) (int, error) {
+	// Launch a tab that connects via SSH and immediately cd to remotePath.
+	shellInit := fmt.Sprintf("cd %s && exec $SHELL", remotePath)
+	args := []string{
+		"@", "--to", socket,
+		"launch", "--type=tab",
+		"--tab-title", title,
+		"ssh", host, "-t", shellInit,
+	}
+
+	cmd := exec.Command("kitty", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("launch ssh tab: %w", err)
+	}
+
+	id, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil {
+		return 0, fmt.Errorf("parse window id from output %q: %w", string(output), err)
+	}
+
+	return id, nil
+}
+
 func (Terminal) SendText(
 	socket string,
 	windowID int,
