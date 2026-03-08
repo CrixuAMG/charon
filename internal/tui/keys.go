@@ -27,6 +27,7 @@ type keyMap struct {
 	RevealPath    key.Binding
 	Archive       key.Binding
 	ToggleArchive key.Binding
+	ThemeCycle    key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -126,6 +127,10 @@ func defaultKeyMap() keyMap {
 		ToggleArchive: key.NewBinding(
 			key.WithKeys("ctrl+a"),
 			key.WithHelp("ctrl+a", "show archived"),
+		),
+		ThemeCycle: key.NewBinding(
+			key.WithKeys("X"),
+			key.WithHelp("X", "theme"),
 		),
 	}
 }

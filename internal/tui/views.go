@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/crixuamg/charon/internal/config"
 	"github.com/crixuamg/charon/internal/execution"
@@ -68,6 +69,14 @@ func (m Model) viewList() string {
 		switch m.currentLayout {
 		case layoutTable, layoutTableCompact:
 			b.WriteString(m.renderProjectsTable(visible))
+		case layoutDetail:
+			for i, pw := range visible {
+				isSelected := (offset + i) == m.cursor
+				b.WriteString(m.renderProjectDetail(pw.project, isSelected))
+				if i < len(visible)-1 {
+					b.WriteString("\n")
+				}
+			}
 		default:
 			for i, pw := range visible {
 				isSelected := (offset + i) == m.cursor
@@ -639,4 +648,121 @@ func (m Model) viewInput() string {
 	b.WriteString(m.styles.Subtext.Render("tab next  ctrl+s open  esc cancel"))
 
 	return m.styles.Form.Render(b.String())
+}
+
+func (m Model) renderProjectDetail(project config.Project, selected bool) string {
+	var content strings.Builder
+
+	exec := execution.Resolve(m.config, project)
+
+	nameStyle := m.styles.ProjectName
+	borderStyle := m.styles.Project
+	if selected {
+		nameStyle = m.styles.SelectedProjectName
+		borderStyle = m.styles.SelectedProject
+	}
+
+	// ── Line 1: icon + name + badges ────────────────────────────────────────
+	icon := "○ "
+	if exec.Type == "docker" {
+		icon = "◆ "
+	}
+	prefix := ""
+	if !project.Exists {
+		prefix += "⚠ "
+	}
+	if project.Pinned {
+		prefix += "📌 "
+	}
+	if project.Archived {
+		prefix += "🗄 "
+	}
+
+	line1 := nameStyle.Render(icon+prefix+project.Name) + "  "
+	if exec.Type == "docker" {
+		line1 += m.styles.DockerBadge.Render("docker")
+	} else {
+		line1 += m.styles.LocalBadge.Render("local")
+	}
+	content.WriteString(line1)
+	content.WriteString("\n")
+
+	// ── Line 2: path ─────────────────────────────────────────────────────────
+	content.WriteString("  " + m.styles.Path.Render(project.Path))
+	content.WriteString("\n")
+
+	// ── Line 3: git info ─────────────────────────────────────────────────────
+	if gi, ok := m.gitInfos[project.Name]; ok && gi.IsRepo {
+		gitPart := ""
+		if gi.HasChanges {
+			gitPart = m.styles.GitDirty.Render("● uncommitted changes")
+		} else {
+			gitPart = m.styles.GitClean.Render("✓ clean")
+		}
+		branchPart := ""
+		if gi.Branch != "" {
+			branchPart = "  " + m.styles.Subtext.Render("branch: "+gi.Branch)
+		}
+		content.WriteString("  " + gitPart + branchPart)
+		content.WriteString("\n")
+	}
+
+	// ── Line 4: tasks ────────────────────────────────────────────────────────
+	taskList := tasks.EffectiveTasks(project, m.config)
+	if len(taskList) > 0 {
+		taskParts := make([]string, len(taskList))
+		for i, t := range taskList {
+			if len(t) > 30 {
+				t = t[:27] + "..."
+			}
+			taskParts[i] = t
+		}
+		content.WriteString("  " + m.styles.Task.Render("tasks: "+strings.Join(taskParts, " • ")))
+		content.WriteString("\n")
+	}
+
+	// ── Line 5: tags ─────────────────────────────────────────────────────────
+	if len(project.Tags) > 0 {
+		var tagParts []string
+		for _, tag := range project.Tags {
+			tagParts = append(tagParts, m.styles.TagBadge.Render("#"+tag))
+		}
+		content.WriteString("  " + strings.Join(tagParts, " "))
+		content.WriteString("\n")
+	}
+
+	// ── Line 6: access stats ──────────────────────────────────────────────────
+	if m.db != nil {
+		count, _ := m.db.GetProjectAccessCount(project.Name)
+		accessedAt, _ := m.db.GetProjectAccessTime(project.Name)
+		if count > 0 || accessedAt != nil {
+			statParts := []string{}
+			if count > 0 {
+				statParts = append(statParts, fmt.Sprintf("opened %d×", count))
+			}
+			if accessedAt != nil {
+				statParts = append(statParts, "last: "+humanizeTime(*accessedAt))
+			}
+			content.WriteString("  " + m.styles.Subtext.Render(strings.Join(statParts, "  ")))
+			content.WriteString("\n")
+		}
+	}
+
+	return borderStyle.Render(content.String())
+}
+
+func humanizeTime(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("2006-01-02")
+	}
 }

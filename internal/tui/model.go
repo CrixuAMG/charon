@@ -29,6 +29,7 @@ const (
 	layoutCardCompact
 	layoutTable
 	layoutTableCompact
+	layoutDetail
 )
 
 func (l layoutMode) String() string {
@@ -41,6 +42,8 @@ func (l layoutMode) String() string {
 		return "table"
 	case layoutTableCompact:
 		return "table-compact"
+	case layoutDetail:
+		return "detail"
 	default:
 		return "card"
 	}
@@ -119,6 +122,8 @@ func getLayout(layoutName string) layoutMode {
 		return layoutTable
 	case "table-compact":
 		return layoutTableCompact
+	case "detail":
+		return layoutDetail
 	default:
 		return layoutCard
 	}
@@ -224,6 +229,12 @@ func (m Model) viewportSize() int {
 			return 1
 		}
 		return available
+	case layoutDetail:
+		// ~6 lines per item (name, path, git, tags, tasks, stats)
+		if available < 6 {
+			return 1
+		}
+		return available / 6
 	default: // layoutCard
 		// 2 content lines (name+path, tasks) + 1 separator = 3 lines per item
 		if available < 3 {
@@ -383,7 +394,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Layout):
-		m.currentLayout = (m.currentLayout + 1) % 4
+		m.currentLayout = (m.currentLayout + 1) % 5
 		m.message = ""
 		// Save layout preference to config
 		m.config.Interface.Layout = m.currentLayout.String()
@@ -493,6 +504,26 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.scrollOffset = 0
 		m.message = ""
+
+	case key.Matches(msg, m.keys.ThemeCycle):
+		themes := []string{"default", "gruvbox", "tokyonight"}
+		current := m.config.Theme
+		next := themes[0]
+		for i, t := range themes {
+			if t == current {
+				next = themes[(i+1)%len(themes)]
+				break
+			}
+		}
+		m.config.Theme = next
+		m.styles = NewStyles(getTheme(next))
+		if err := config.Save(m.config); err != nil {
+			m.message = "Failed to save theme"
+			m.isError = true
+		} else {
+			m.message = "Theme: " + next
+			m.isError = false
+		}
 	}
 
 	return m, nil
