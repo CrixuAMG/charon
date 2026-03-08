@@ -11,7 +11,15 @@ const (
 	stateTasksetAdd
 	stateTasksetEdit
 	stateTasksetDelete
-	stateInput // prompting for task template parameters
+	stateInput       // prompting for task template parameters
+	stateBulkConfirm // confirming a bulk operation
+)
+
+type bulkAction int
+
+const (
+	bulkDelete  bulkAction = iota
+	bulkArchive            // archives or unarchives all selected
 )
 
 type sortMode int

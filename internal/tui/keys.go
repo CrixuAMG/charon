@@ -28,6 +28,9 @@ type keyMap struct {
 	Archive       key.Binding
 	ToggleArchive key.Binding
 	ThemeCycle    key.Binding
+	Select        key.Binding
+	BulkDelete    key.Binding
+	BulkArchive   key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -41,7 +44,7 @@ func defaultKeyMap() keyMap {
 			key.WithHelp("↓/j", "move down"),
 		),
 		Enter: key.NewBinding(
-			key.WithKeys("enter", " "),
+			key.WithKeys("enter"),
 			key.WithHelp("enter", "open project"),
 		),
 		Search: key.NewBinding(
@@ -131,6 +134,18 @@ func defaultKeyMap() keyMap {
 		ThemeCycle: key.NewBinding(
 			key.WithKeys("X"),
 			key.WithHelp("X", "theme"),
+		),
+		Select: key.NewBinding(
+			key.WithKeys(" "),
+			key.WithHelp("space", "select"),
+		),
+		BulkDelete: key.NewBinding(
+			key.WithKeys("ctrl+d"),
+			key.WithHelp("ctrl+d", "bulk delete"),
+		),
+		BulkArchive: key.NewBinding(
+			key.WithKeys("ctrl+r"),
+			key.WithHelp("ctrl+r", "bulk archive"),
 		),
 	}
 }

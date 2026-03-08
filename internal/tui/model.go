@@ -88,6 +88,9 @@ type Model struct {
 	inputValues    map[string]string
 	inputFocus     int
 	pendingProject *config.Project
+	// Multi-select / bulk operations
+	selected         map[int]bool // keyed by original config.Projects index
+	pendingBulkOp    bulkAction
 }
 
 func NewModel(cfg *config.Config) Model {
@@ -308,6 +311,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateTasksetDelete(msg)
 		case stateInput:
 			return m.updateInput(msg)
+		case stateBulkConfirm:
+			return m.updateBulkConfirm(msg)
 		}
 	}
 
@@ -523,6 +528,39 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.message = "Theme: " + next
 			m.isError = false
+		}
+
+	case key.Matches(msg, m.keys.Select):
+		if len(filtered) > 0 {
+			idx := getOriginalIndex(filtered, m.cursor)
+			if m.selected == nil {
+				m.selected = make(map[int]bool)
+			}
+			if m.selected[idx] {
+				delete(m.selected, idx)
+			} else {
+				m.selected[idx] = true
+			}
+			// Advance cursor after toggling.
+			if m.cursor < len(filtered)-1 {
+				m.cursor++
+				m.scrollOffset = adjustScroll(m.cursor, m.scrollOffset, m.viewportSize())
+			}
+			m.message = ""
+		}
+
+	case key.Matches(msg, m.keys.BulkDelete):
+		if len(m.selected) > 0 {
+			m.pendingBulkOp = bulkDelete
+			m.state = stateBulkConfirm
+			m.message = ""
+		}
+
+	case key.Matches(msg, m.keys.BulkArchive):
+		if len(m.selected) > 0 {
+			m.pendingBulkOp = bulkArchive
+			m.state = stateBulkConfirm
+			m.message = ""
 		}
 	}
 
@@ -832,6 +870,72 @@ func (m Model) updateDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateBulkConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("y", "enter"))):
+		switch m.pendingBulkOp {
+		case bulkDelete:
+			// Delete in reverse order to preserve indices.
+			indices := make([]int, 0, len(m.selected))
+			for idx := range m.selected {
+				indices = append(indices, idx)
+			}
+			// Sort descending.
+			for i := 0; i < len(indices); i++ {
+				for j := i + 1; j < len(indices); j++ {
+					if indices[j] > indices[i] {
+						indices[i], indices[j] = indices[j], indices[i]
+					}
+				}
+			}
+			for _, idx := range indices {
+				m.config.Projects = append(m.config.Projects[:idx], m.config.Projects[idx+1:]...)
+			}
+			if m.cursor >= len(m.config.Projects) && m.cursor > 0 {
+				m.cursor = len(m.config.Projects) - 1
+			}
+			if err := config.Save(m.config); err != nil {
+				m.message = "Error saving: " + err.Error()
+				m.isError = true
+			} else {
+				m.message = "Deleted selected projects"
+				m.isError = false
+			}
+
+		case bulkArchive:
+			// Toggle archived state: if any is not archived, archive all; otherwise unarchive all.
+			anyNotArchived := false
+			for idx := range m.selected {
+				if !m.config.Projects[idx].Archived {
+					anyNotArchived = true
+					break
+				}
+			}
+			for idx := range m.selected {
+				m.config.Projects[idx].Archived = anyNotArchived
+			}
+			if err := config.Save(m.config); err != nil {
+				m.message = "Error saving: " + err.Error()
+				m.isError = true
+			} else {
+				if anyNotArchived {
+					m.message = "Archived selected projects"
+				} else {
+					m.message = "Unarchived selected projects"
+				}
+				m.isError = false
+			}
+		}
+		m.selected = nil
+		m.state = stateList
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("n", "esc", "q"))):
+		m.state = stateList
+	}
+
+	return m, nil
+}
+
 func (m Model) View() string {
 	if m.quitting {
 		return ""
@@ -864,6 +968,8 @@ func (m Model) View() string {
 		mainContent = m.viewTasksetDelete()
 	case stateInput:
 		mainContent = m.viewInput()
+	case stateBulkConfirm:
+		mainContent = m.viewBulkConfirm()
 	}
 
 	content.WriteString(mainContent)

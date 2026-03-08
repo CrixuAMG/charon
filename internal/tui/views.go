@@ -40,6 +40,10 @@ func (m Model) viewList() string {
 	}
 	statusParts = append(statusParts, m.styles.StatusBar.Render("Projects: "+count))
 
+	if len(m.selected) > 0 {
+		statusParts = append(statusParts, m.styles.Error.Render(fmt.Sprintf("Selected: %d  ctrl+d delete  ctrl+r archive", len(m.selected))))
+	}
+
 	if len(statusParts) > 0 {
 		b.WriteString(strings.Join(statusParts, " "))
 		b.WriteString("\n\n")
@@ -73,7 +77,8 @@ func (m Model) viewList() string {
 		case layoutDetail:
 			for i, pw := range visible {
 				isSelected := (offset + i) == m.cursor
-				b.WriteString(m.renderProjectDetail(pw.project, isSelected))
+				isMultiSelected := m.selected[pw.index]
+				b.WriteString(m.renderProjectDetail(pw.project, isSelected, isMultiSelected))
 				if i < len(visible)-1 {
 					b.WriteString("\n")
 				}
@@ -81,7 +86,8 @@ func (m Model) viewList() string {
 		default:
 			for i, pw := range visible {
 				isSelected := (offset + i) == m.cursor
-				b.WriteString(m.renderProjectCard(pw.project, isSelected))
+				isMultiSelected := m.selected[pw.index]
+				b.WriteString(m.renderProjectCard(pw.project, isSelected, isMultiSelected))
 				if i < len(visible)-1 {
 					b.WriteString("\n")
 				}
@@ -223,7 +229,7 @@ func (m Model) viewDelete() string {
 	return b.String()
 }
 
-func (m Model) renderProjectCard(project config.Project, selected bool) string {
+func (m Model) renderProjectCard(project config.Project, selected bool, multiSelected bool) string {
 	var content strings.Builder
 
 	nameStyle := m.styles.ProjectName
@@ -232,6 +238,15 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 	}
 
 	exec := execution.Resolve(m.config, project)
+
+	checkbox := ""
+	if len(m.selected) > 0 {
+		if multiSelected {
+			checkbox = "[x] "
+		} else {
+			checkbox = "[ ] "
+		}
+	}
 
 	warningIcon := ""
 	icon := "○ "
@@ -251,7 +266,7 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 		archivePrefix = "🗄 "
 	}
 
-	name := nameStyle.Render(icon + warningIcon + pin + archivePrefix + project.Name)
+	name := nameStyle.Render(checkbox + icon + warningIcon + pin + archivePrefix + project.Name)
 	content.WriteString(name)
 	content.WriteString(" ")
 
@@ -324,6 +339,7 @@ func (m Model) renderHelpBar() string {
 			items = []string{
 				m.helpItem("↑/↓", "navigate"),
 				m.helpItem("enter", "open"),
+				m.helpItem("space", "select"),
 				m.helpItem("/", "search"),
 				m.helpItem("s", "sort"),
 				m.helpItem("f", "filter"),
@@ -367,6 +383,11 @@ func (m Model) renderHelpBar() string {
 			m.helpItem("esc", "cancel"),
 		}
 	case stateTasksetDelete:
+		items = []string{
+			m.helpItem("y", "confirm"),
+			m.helpItem("n", "cancel"),
+		}
+	case stateBulkConfirm:
 		items = []string{
 			m.helpItem("y", "confirm"),
 			m.helpItem("n", "cancel"),
@@ -531,19 +552,28 @@ func (m Model) renderProjectsTable(filtered []projectWithIndex) string {
 	// Table rows
 	for i, pw := range filtered {
 		isSelected := i == m.cursor
-		b.WriteString(m.renderProjectTableRow(pw.project, isSelected, isCompact))
+		isMultiSelected := m.selected[pw.index]
+		b.WriteString(m.renderProjectTableRow(pw.project, isSelected, isCompact, isMultiSelected))
 		b.WriteString("\n")
 	}
 
 	return b.String()
 }
 
-func (m Model) renderProjectTableRow(project config.Project, selected bool, compact bool) string {
+func (m Model) renderProjectTableRow(project config.Project, selected bool, compact bool, multiSelected bool) string {
 	var row strings.Builder
 
 	exec := execution.Resolve(m.config, project)
 
 	// Icons and name
+	checkbox := ""
+	if len(m.selected) > 0 {
+		if multiSelected {
+			checkbox = "[x] "
+		} else {
+			checkbox = "[ ] "
+		}
+	}
 	warningIcon := ""
 	icon := "○"
 	pin := ""
@@ -563,7 +593,7 @@ func (m Model) renderProjectTableRow(project config.Project, selected bool, comp
 	}
 
 	// Name column (max 20 chars)
-	nameText := icon + " " + warningIcon + pin + project.Name
+	nameText := checkbox + icon + " " + warningIcon + pin + project.Name
 	if len(nameText) > 20 {
 		nameText = nameText[:17] + "..."
 	}
@@ -651,7 +681,20 @@ func (m Model) viewInput() string {
 	return m.styles.Form.Render(b.String())
 }
 
-func (m Model) renderProjectDetail(project config.Project, selected bool) string {
+func (m Model) viewBulkConfirm() string {
+	var b strings.Builder
+	n := len(m.selected)
+	action := "delete"
+	if m.pendingBulkOp == bulkArchive {
+		action = "archive/unarchive"
+	}
+	b.WriteString(m.styles.ProjectName.Render(fmt.Sprintf("%s %d project(s)?", strings.Title(action), n)))
+	b.WriteString("\n\n")
+	b.WriteString(m.styles.Subtext.Render("y / enter confirm  n / esc cancel"))
+	return m.styles.Form.Render(b.String())
+}
+
+func (m Model) renderProjectDetail(project config.Project, selected bool, multiSelected bool) string {
 	var content strings.Builder
 
 	exec := execution.Resolve(m.config, project)
@@ -669,6 +712,13 @@ func (m Model) renderProjectDetail(project config.Project, selected bool) string
 		icon = "◆ "
 	}
 	prefix := ""
+	if len(m.selected) > 0 {
+		if multiSelected {
+			prefix += "[x] "
+		} else {
+			prefix += "[ ] "
+		}
+	}
 	if !project.Exists {
 		prefix += "⚠ "
 	}
