@@ -14,6 +14,7 @@ const (
 	stateInput       // prompting for task template parameters
 	stateBulkConfirm // confirming a bulk operation
 	stateNote        // viewing the note of the selected project
+	stateDashboard   // compact matrix overview of all projects
 )
 
 type bulkAction int

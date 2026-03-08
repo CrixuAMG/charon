@@ -404,6 +404,10 @@ func (m Model) renderHelpBar() string {
 			m.helpItem("ctrl+n", "edit"),
 			m.helpItem("esc", "back"),
 		}
+	case stateDashboard:
+		items = []string{
+			m.helpItem("esc / D", "back"),
+		}
 	}
 
 	return m.styles.Help.Render(strings.Join(items, " "+m.styles.HelpSeparator.String()+" "))
@@ -691,6 +695,89 @@ func (m Model) viewInput() string {
 	b.WriteString(m.styles.Subtext.Render("tab next  ctrl+s open  esc cancel"))
 
 	return m.styles.Form.Render(b.String())
+}
+
+func (m Model) viewDashboard() string {
+	var b strings.Builder
+
+	b.WriteString(m.styles.ProjectName.Render("Dashboard"))
+	b.WriteString("  ")
+	b.WriteString(m.styles.Subtext.Render(fmt.Sprintf("%d projects", len(m.config.Projects))))
+	b.WriteString("\n\n")
+
+	// Column widths.
+	nameW := 20
+	typeW := 6
+	gitW := 10
+
+	// Header.
+	hdr := m.styles.ProjectName.Bold(true)
+	b.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s  %s\n",
+		nameW, hdr.Render("NAME"),
+		typeW, hdr.Render("TYPE"),
+		gitW, hdr.Render("GIT"),
+		hdr.Render("TAGS"),
+	))
+	if m.width > 4 {
+		b.WriteString(m.styles.Subtext.Render(strings.Repeat("─", m.width-4)))
+		b.WriteString("\n")
+	}
+
+	for _, p := range m.config.Projects {
+		exec := execution.Resolve(m.config, p)
+
+		// Name column.
+		name := p.Name
+		if !p.Exists {
+			name = "⚠ " + name
+		}
+		if p.Pinned {
+			name = "📌 " + name
+		}
+		if p.Archived {
+			name = "🗄 " + name
+		}
+		if len(name) > nameW {
+			name = name[:nameW-3] + "..."
+		}
+
+		// Type column.
+		typeBadge := "local"
+		switch exec.Type {
+		case "docker":
+			typeBadge = "docker"
+		case "ssh":
+			typeBadge = "ssh"
+		}
+
+		// Git column.
+		gitStatus := ""
+		if gi, ok := m.gitInfos[p.Name]; ok && gi.IsRepo {
+			if gi.HasChanges {
+				gitStatus = m.styles.GitDirty.Render("*" + gi.Branch)
+			} else {
+				gitStatus = m.styles.GitClean.Render(gi.Branch)
+			}
+		}
+
+		// Tags.
+		tagStr := ""
+		if len(p.Tags) > 0 {
+			tagStr = "#" + strings.Join(p.Tags, " #")
+		}
+
+		b.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s  %s\n",
+			nameW, name,
+			typeW, typeBadge,
+			gitW, gitStatus,
+			tagStr,
+		))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(m.styles.Subtext.Render("esc / D back"))
+
+	return b.String()
 }
 
 func (m Model) viewNote() string {

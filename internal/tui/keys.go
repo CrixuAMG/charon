@@ -33,6 +33,7 @@ type keyMap struct {
 	BulkArchive   key.Binding
 	Note          key.Binding
 	EditNote      key.Binding
+	Dashboard     key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -156,6 +157,10 @@ func defaultKeyMap() keyMap {
 		EditNote: key.NewBinding(
 			key.WithKeys("ctrl+n"),
 			key.WithHelp("ctrl+n", "edit note"),
+		),
+		Dashboard: key.NewBinding(
+			key.WithKeys("D"),
+			key.WithHelp("D", "dashboard"),
 		),
 	}
 }

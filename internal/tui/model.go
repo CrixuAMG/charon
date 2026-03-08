@@ -343,6 +343,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateBulkConfirm(msg)
 		case stateNote:
 			return m.updateNote(msg)
+		case stateDashboard:
+			return m.updateDashboard(msg)
 		}
 	}
 
@@ -603,6 +605,10 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(filtered) > 0 {
 			return m.openNoteEditor(filtered)
 		}
+
+	case key.Matches(msg, m.keys.Dashboard):
+		m.state = stateDashboard
+		m.message = ""
 	}
 
 	return m, nil
@@ -990,6 +996,15 @@ func (m Model) updateNote(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Cancel), key.Matches(msg, m.keys.Quit),
+		key.Matches(msg, m.keys.Dashboard):
+		m.state = stateList
+	}
+	return m, nil
+}
+
 func (m Model) openNoteEditor(filtered []projectWithIndex) (tea.Model, tea.Cmd) {
 	idx := getOriginalIndex(filtered, m.cursor)
 	project := &m.config.Projects[idx]
@@ -1176,6 +1191,8 @@ func (m Model) View() string {
 		mainContent = m.viewBulkConfirm()
 	case stateNote:
 		mainContent = m.viewNote()
+	case stateDashboard:
+		mainContent = m.viewDashboard()
 	}
 
 	content.WriteString(mainContent)
