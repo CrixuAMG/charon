@@ -14,6 +14,11 @@ type TaskSets struct {
 	Tasks []string `yaml:"tasks"`
 }
 
+type Hooks struct {
+	Before string `yaml:"before,omitempty"`
+	After  string `yaml:"after,omitempty"`
+}
+
 type Project struct {
 	Name      string            `yaml:"name"`
 	Pinned    bool              `yaml:"pinned,omitempty"`
@@ -24,6 +29,7 @@ type Project struct {
 	TasksFrom string            `yaml:"tasks_from,omitempty"`
 	Tags      []string          `yaml:"tags,omitempty"`
 	Env       map[string]string `yaml:"env,omitempty"`
+	Hooks     *Hooks            `yaml:"hooks,omitempty"`
 
 	Exists bool `yaml:"-"`
 }

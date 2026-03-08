@@ -722,6 +722,21 @@ func (m Model) renderProjectDetail(project config.Project, selected bool) string
 		content.WriteString("\n")
 	}
 
+	// ── Line 5: hooks ────────────────────────────────────────────────────────
+	if project.Hooks != nil {
+		var hookParts []string
+		if project.Hooks.Before != "" {
+			hookParts = append(hookParts, "before: "+project.Hooks.Before)
+		}
+		if project.Hooks.After != "" {
+			hookParts = append(hookParts, "after: "+project.Hooks.After)
+		}
+		if len(hookParts) > 0 {
+			content.WriteString("  " + m.styles.Subtext.Render("hooks: "+strings.Join(hookParts, "  ")))
+			content.WriteString("\n")
+		}
+	}
+
 	// ── Line 5: env vars ─────────────────────────────────────────────────────
 	if len(project.Env) > 0 {
 		keys := make([]string, 0, len(project.Env))

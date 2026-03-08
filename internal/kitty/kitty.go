@@ -3,6 +3,7 @@ package kitty
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +29,17 @@ func findKittySocket() (string, error) {
 	return "unix:" + matches[0], nil
 }
 
+// runHook executes a hook command in a shell, inheriting the current environment.
+func runHook(command string) error {
+	if command == "" {
+		return nil
+	}
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func OpenProject(project config.Project, cfg *config.Config) error {
 	socket, err := findKittySocket()
 	if err != nil {
@@ -39,12 +51,24 @@ func OpenProject(project config.Project, cfg *config.Config) error {
 		return fmt.Errorf("no tasks defined for project %q", project.Name)
 	}
 
+	if project.Hooks != nil {
+		if err := runHook(project.Hooks.Before); err != nil {
+			return fmt.Errorf("before-hook failed: %w", err)
+		}
+	}
+
 	execCfg := execution.Resolve(cfg, project)
 	executor := execution.NewExecutor(execCfg, Terminal{})
 
 	for _, task := range taskList {
 		if err := executor.OpenTab(socket, getTabTitle(task), project, task); err != nil {
 			return fmt.Errorf("open tab for %q: %w", task, err)
+		}
+	}
+
+	if project.Hooks != nil {
+		if err := runHook(project.Hooks.After); err != nil {
+			return fmt.Errorf("after-hook failed: %w", err)
 		}
 	}
 
