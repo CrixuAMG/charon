@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"sync"
 
 	"github.com/crixuamg/charon/internal/autodiscover"
 	"github.com/crixuamg/charon/internal/config"
@@ -34,9 +35,33 @@ func AutoDiscover(cfg *config.Config) error {
 	return nil
 }
 
+// UpdateProjectStatus checks whether each project path exists on disk.
+// Checks run concurrently so startup stays fast with many projects.
 func UpdateProjectStatus(cfg *config.Config) {
-	for i := range cfg.Projects {
-		_, err := os.Stat(cfg.Projects[i].Path)
-		cfg.Projects[i].Exists = err == nil
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	type result struct {
+		index  int
+		exists bool
+	}
+
+	results := make([]result, len(cfg.Projects))
+
+	for i, p := range cfg.Projects {
+		wg.Add(1)
+		go func(idx int, path string) {
+			defer wg.Done()
+			_, err := os.Stat(path)
+			mu.Lock()
+			results[idx] = result{index: idx, exists: err == nil}
+			mu.Unlock()
+		}(i, p.Path)
+	}
+
+	wg.Wait()
+
+	for _, r := range results {
+		cfg.Projects[r.index].Exists = r.exists
 	}
 }
