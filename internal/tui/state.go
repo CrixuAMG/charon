@@ -18,6 +18,7 @@ type sortMode int
 const (
 	sortByName sortMode = iota
 	sortByRecent
+	sortByFrequent
 	sortByCustom
 )
 
@@ -35,6 +36,8 @@ func (s sortMode) String() string {
 		return "Name"
 	case sortByRecent:
 		return "Recent"
+	case sortByFrequent:
+		return "Frequent"
 	case sortByCustom:
 		return "Custom"
 	default:

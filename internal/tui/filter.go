@@ -92,13 +92,24 @@ func fuzzyFilterProjects(projects []projectWithIndex, query string) []projectWit
 }
 
 func sortProjects(projects []projectWithIndex, mode sortMode, database *db.DB) {
-	// Cache access times upfront to avoid O(n log n) DB queries during sort.
+	// Cache DB data upfront to avoid O(n log n) queries during sort.
 	var accessTimes map[string]*time.Time
-	if mode == sortByRecent && database != nil {
-		accessTimes = make(map[string]*time.Time, len(projects))
-		for _, p := range projects {
-			t, _ := database.GetProjectAccessTime(p.project.Name)
-			accessTimes[p.project.Name] = t
+	var accessCounts map[string]int
+
+	if database != nil {
+		switch mode {
+		case sortByRecent:
+			accessTimes = make(map[string]*time.Time, len(projects))
+			for _, p := range projects {
+				t, _ := database.GetProjectAccessTime(p.project.Name)
+				accessTimes[p.project.Name] = t
+			}
+		case sortByFrequent:
+			accessCounts = make(map[string]int, len(projects))
+			for _, p := range projects {
+				c, _ := database.GetProjectAccessCount(p.project.Name)
+				accessCounts[p.project.Name] = c
+			}
 		}
 	}
 
@@ -127,6 +138,9 @@ func sortProjects(projects []projectWithIndex, mode sortMode, database *db.DB) {
 				return true
 			}
 			return ti.After(*tj)
+
+		case sortByFrequent:
+			return accessCounts[pi.Name] > accessCounts[pj.Name]
 
 		default: // sortByCustom — preserve original config order
 			return projects[i].index < projects[j].index

@@ -342,7 +342,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = ""
 
 	case key.Matches(msg, m.keys.Sort):
-		m.currentSort = (m.currentSort + 1) % 3
+		m.currentSort = (m.currentSort + 1) % 4
 		m.cursor = 0
 		m.scrollOffset = 0
 		m.message = ""
