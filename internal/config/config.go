@@ -22,6 +22,7 @@ type Hooks struct {
 type Project struct {
 	Name      string            `yaml:"name"`
 	Alias     string            `yaml:"alias,omitempty"`
+	Note      string            `yaml:"note,omitempty"`
 	Pinned    bool              `yaml:"pinned,omitempty"`
 	Archived  bool              `yaml:"archived,omitempty"`
 	Path      string            `yaml:"path"`

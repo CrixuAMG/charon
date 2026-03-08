@@ -31,6 +31,8 @@ type keyMap struct {
 	Select        key.Binding
 	BulkDelete    key.Binding
 	BulkArchive   key.Binding
+	Note          key.Binding
+	EditNote      key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -146,6 +148,14 @@ func defaultKeyMap() keyMap {
 		BulkArchive: key.NewBinding(
 			key.WithKeys("ctrl+r"),
 			key.WithHelp("ctrl+r", "bulk archive"),
+		),
+		Note: key.NewBinding(
+			key.WithKeys("n"),
+			key.WithHelp("n", "note"),
+		),
+		EditNote: key.NewBinding(
+			key.WithKeys("ctrl+n"),
+			key.WithHelp("ctrl+n", "edit note"),
 		),
 	}
 }

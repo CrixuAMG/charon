@@ -392,6 +392,11 @@ func (m Model) renderHelpBar() string {
 			m.helpItem("y", "confirm"),
 			m.helpItem("n", "cancel"),
 		}
+	case stateNote:
+		items = []string{
+			m.helpItem("ctrl+n", "edit"),
+			m.helpItem("esc", "back"),
+		}
 	}
 
 	return m.styles.Help.Render(strings.Join(items, " "+m.styles.HelpSeparator.String()+" "))
@@ -681,6 +686,30 @@ func (m Model) viewInput() string {
 	return m.styles.Form.Render(b.String())
 }
 
+func (m Model) viewNote() string {
+	var b strings.Builder
+
+	filtered := m.getFilteredProjects()
+	if m.cursor >= len(filtered) {
+		return ""
+	}
+	project := filtered[m.cursor].project
+
+	b.WriteString(m.styles.ProjectName.Render("Note — " + project.Name))
+	b.WriteString("\n\n")
+
+	if project.Note == "" {
+		b.WriteString(m.styles.Subtext.Render("(no note)"))
+	} else {
+		b.WriteString(project.Note)
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(m.styles.Subtext.Render("ctrl+n edit  esc back"))
+
+	return m.styles.Form.Render(b.String())
+}
+
 func (m Model) viewBulkConfirm() string {
 	var b strings.Builder
 	n := len(m.selected)
@@ -802,7 +831,20 @@ func (m Model) renderProjectDetail(project config.Project, selected bool, multiS
 		content.WriteString("\n")
 	}
 
-	// ── Line 6: tags ─────────────────────────────────────────────────────────
+	// ── Line 6: note (first line) ────────────────────────────────────────────
+	if project.Note != "" {
+		firstLine := project.Note
+		if idx := strings.Index(firstLine, "\n"); idx >= 0 {
+			firstLine = firstLine[:idx]
+		}
+		if len(firstLine) > 60 {
+			firstLine = firstLine[:57] + "..."
+		}
+		content.WriteString("  " + m.styles.Subtext.Render("note: "+firstLine))
+		content.WriteString("\n")
+	}
+
+	// ── Line 7: tags ─────────────────────────────────────────────────────────
 	if len(project.Tags) > 0 {
 		var tagParts []string
 		for _, tag := range project.Tags {

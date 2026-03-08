@@ -13,6 +13,7 @@ const (
 	stateTasksetDelete
 	stateInput       // prompting for task template parameters
 	stateBulkConfirm // confirming a bulk operation
+	stateNote        // viewing the note of the selected project
 )
 
 type bulkAction int
