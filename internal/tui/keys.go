@@ -23,8 +23,10 @@ type keyMap struct {
 	Confirm   key.Binding
 	Deny      key.Binding
 	Tasksets  key.Binding
-	TagFilter  key.Binding
-	RevealPath key.Binding
+	TagFilter    key.Binding
+	RevealPath   key.Binding
+	Archive      key.Binding
+	ToggleArchive key.Binding
 }
 
 func defaultKeyMap() keyMap {
@@ -116,6 +118,14 @@ func defaultKeyMap() keyMap {
 		RevealPath: key.NewBinding(
 			key.WithKeys("ctrl+o"),
 			key.WithHelp("ctrl+o", "reveal"),
+		),
+		Archive: key.NewBinding(
+			key.WithKeys("A"),
+			key.WithHelp("A", "archive"),
+		),
+		ToggleArchive: key.NewBinding(
+			key.WithKeys("ctrl+a"),
+			key.WithHelp("ctrl+a", "show archived"),
 		),
 	}
 }

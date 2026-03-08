@@ -75,6 +75,7 @@ type Model struct {
 	formTasksetNames []string
 	scrollOffset     int
 	gitInfos         map[string]gitinfo.Info
+	showArchived     bool
 	// Taskset management fields
 	tasksetCursor   int
 	editTasksetName string // name of taskset being edited
@@ -238,7 +239,7 @@ func adjustScroll(cursor, offset, viewSize int) int {
 }
 
 func (m Model) getFilteredProjects() []projectWithIndex {
-	filtered := filterProjects(m.config.Projects, m.config, m.currentFilter, m.activeTag, m.searchQuery)
+	filtered := filterProjects(m.config.Projects, m.config, m.currentFilter, m.activeTag, m.showArchived, m.searchQuery)
 	sortProjects(filtered, m.currentSort, m.db)
 	return filtered
 }
@@ -436,6 +437,34 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.message = ""
 			}
 		}
+
+	case key.Matches(msg, m.keys.Archive):
+		if len(filtered) > 0 {
+			idx := getOriginalIndex(filtered, m.cursor)
+			m.config.Projects[idx].Archived = !m.config.Projects[idx].Archived
+			archived := m.config.Projects[idx].Archived
+			if err := config.Save(m.config); err != nil {
+				m.message = "Error saving: " + err.Error()
+				m.isError = true
+			} else if archived {
+				m.message = "Project archived"
+				m.isError = false
+			} else {
+				m.message = "Project unarchived"
+				m.isError = false
+			}
+			// Move cursor if the project just disappeared from view.
+			filtered = m.getFilteredProjects()
+			if m.cursor >= len(filtered) && m.cursor > 0 {
+				m.cursor--
+			}
+		}
+
+	case key.Matches(msg, m.keys.ToggleArchive):
+		m.showArchived = !m.showArchived
+		m.cursor = 0
+		m.scrollOffset = 0
+		m.message = ""
 	}
 
 	return m, nil

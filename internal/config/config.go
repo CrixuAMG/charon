@@ -17,6 +17,7 @@ type TaskSets struct {
 type Project struct {
 	Name      string     `yaml:"name"`
 	Pinned    bool       `yaml:"pinned,omitempty"`
+	Archived  bool       `yaml:"archived,omitempty"`
 	Path      string     `yaml:"path"`
 	Execution *Execution `yaml:"execution"`
 	Tasks     []string   `yaml:"tasks,omitempty"`

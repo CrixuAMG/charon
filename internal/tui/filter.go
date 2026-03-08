@@ -16,10 +16,13 @@ type projectWithIndex struct {
 	index   int
 }
 
-func filterProjects(projects []config.Project, cfg *config.Config, filter filterMode, activeTag string, searchQuery string) []projectWithIndex {
+func filterProjects(projects []config.Project, cfg *config.Config, filter filterMode, activeTag string, showArchived bool, searchQuery string) []projectWithIndex {
 	var filtered []projectWithIndex
 
 	for i, p := range projects {
+		if p.Archived && !showArchived {
+			continue
+		}
 		if !matchesFilter(p, cfg, filter) {
 			continue
 		}

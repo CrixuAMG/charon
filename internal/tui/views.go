@@ -24,6 +24,9 @@ func (m Model) viewList() string {
 	if m.activeTag != "" {
 		statusParts = append(statusParts, m.styles.FilterBadge.Render("Tag: "+m.activeTag))
 	}
+	if m.showArchived {
+		statusParts = append(statusParts, m.styles.FilterBadge.Render("Archived: visible"))
+	}
 	if m.currentSort != sortByCustom {
 		statusParts = append(statusParts, m.styles.FilterBadge.Render("Sort: "+m.currentSort.String()))
 	}
@@ -233,7 +236,12 @@ func (m Model) renderProjectCard(project config.Project, selected bool) string {
 		pin = "📌 "
 	}
 
-	name := nameStyle.Render(icon + warningIcon + pin + project.Name)
+	archivePrefix := ""
+	if project.Archived {
+		archivePrefix = "🗄 "
+	}
+
+	name := nameStyle.Render(icon + warningIcon + pin + archivePrefix + project.Name)
 	content.WriteString(name)
 	content.WriteString(" ")
 
@@ -315,6 +323,8 @@ func (m Model) renderHelpBar() string {
 				m.helpItem("a", "add"),
 				m.helpItem("e", "edit"),
 				m.helpItem("d", "delete"),
+				m.helpItem("A", "archive"),
+				m.helpItem("ctrl+a", "show archived"),
 				m.helpItem("t", "tasksets"),
 				m.helpItem("q", "quit"),
 			}
